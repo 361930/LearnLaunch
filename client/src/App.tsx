@@ -1,67 +1,64 @@
 import { Switch, Route } from "wouter";
-import Home from "@/pages/home";
-import Classes from "@/pages/classes";
-import Register from "@/pages/register";
-import StudentDashboard from "@/pages/dashboard/student";
-import TeacherDashboard from "@/pages/dashboard/teacher";
-import AdminDashboard from "@/pages/dashboard/admin";
-import NotFound from "@/pages/not-found";
-import { useEffect, useState } from "react";
-import { User } from "@/lib/types";
+import { AuthProvider } from "@/hooks/use-auth";
+import { ProtectedRoute } from "@/components/protected-route";
+import { ThemeProvider } from "@/components/theme-provider";
 
-function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+// Page imports
+import HomePage from "@/pages/home";
+import ClassesPage from "@/pages/classes";
+import ClassDetailPage from "@/pages/class-detail";
+import AuthPage from "@/pages/auth";
+import StudentDashboardPage from "@/pages/dashboard/student";
+import TeacherDashboardPage from "@/pages/dashboard/teacher";
+import AdminDashboardPage from "@/pages/dashboard/admin";
+import ProfilePage from "@/pages/profile";
+import NotFoundPage from "@/pages/not-found";
+import ChallengesPage from "@/pages/challenges";
+import ChallengeDetailPage from "@/pages/challenge-detail";
 
-  useEffect(() => {
-    // Check if there's a user session on app load
-    const checkSession = async () => {
-      try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
-        if (res.ok) {
-          const userData = await res.json();
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error("Failed to fetch user session:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkSession();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
+function Router() {
   return (
     <Switch>
-      <Route path="/" component={() => <Home user={user} />} />
-      <Route path="/classes" component={() => <Classes user={user} />} />
-      <Route path="/register" component={() => <Register user={user} />} />
-      <Route path="/dashboard/student" component={() => {
-        return user && user.role === "student" 
-          ? <StudentDashboard user={user} /> 
-          : <NotFound />;
-      }} />
-      <Route path="/dashboard/teacher" component={() => {
-        return user && user.role === "teacher" 
-          ? <TeacherDashboard user={user} /> 
-          : <NotFound />;
-      }} />
-      <Route path="/dashboard/admin" component={() => {
-        return user && user.role === "admin" 
-          ? <AdminDashboard user={user} /> 
-          : <NotFound />;
-      }} />
-      <Route component={NotFound} />
+      <Route path="/" component={HomePage} />
+      <Route path="/classes" component={ClassesPage} />
+      <Route path="/classes/:id" component={ClassDetailPage} />
+      <Route path="/challenges" component={ChallengesPage} />
+      <Route path="/challenges/:id" component={ChallengeDetailPage} />
+      <Route path="/auth" component={AuthPage} />
+      <Route path="/profile/:id" component={ProfilePage} />
+      
+      {/* Protected Routes */}
+      <ProtectedRoute 
+        path="/dashboard/student" 
+        component={StudentDashboardPage} 
+        roles={["student"]} 
+      />
+      <ProtectedRoute 
+        path="/dashboard/teacher" 
+        component={TeacherDashboardPage} 
+        roles={["teacher"]} 
+      />
+      <ProtectedRoute 
+        path="/dashboard/admin" 
+        component={AdminDashboardPage} 
+        roles={["admin"]} 
+      />
+      
+      {/* 404 Route */}
+      <Route component={NotFoundPage} />
     </Switch>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider defaultTheme="system" storageKey="globalEduConnect-theme">
+      <AuthProvider>
+        <div className="min-h-screen bg-background">
+          <Router />
+        </div>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

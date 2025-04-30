@@ -1,206 +1,276 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { Link } from "wouter";
+import { Class } from "@/lib/types";
 import Header from "@/components/layout/header";
-import Footer from "@/components/layout/footer";
-import ClassCard from "@/components/classes/class-card";
-import { User, Class } from "@/lib/types";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Helmet } from "react-helmet";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { BookOpen, Search, Filter, Loader2 } from "lucide-react";
 
-interface ClassesProps {
-  user: User | null;
-}
+export default function ClassesPage() {
+  // Filter and pagination state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [language, setLanguage] = useState("");
+  const [level, setLevel] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9;
 
-const Classes = ({ user }: ClassesProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedLevel, setSelectedLevel] = useState("all");
-  const [, params] = useLocation();
-  const { toast } = useToast();
-  
-  // Parse URL search params
-  const urlParams = new URLSearchParams(params);
-  const categoryFromUrl = urlParams.get("category");
-  
-  // Initialize filters from URL if present
-  useState(() => {
-    if (categoryFromUrl) {
-      setSelectedCategory(categoryFromUrl);
-    }
+  // Fetch classes with filters
+  const { data: classes, isLoading, refetch } = useQuery<Class[]>({
+    queryKey: ["/api/classes", { search: searchQuery, category, language, level }],
   });
-  
-  const { data: classes, isLoading, error } = useQuery<Class[]>({
-    queryKey: ["/api/classes"],
-  });
 
-  const handleJoinClass = async (classId: string) => {
-    try {
-      if (!user) {
-        // If not logged in, show login prompt
-        document.dispatchEvent(new CustomEvent("open-login-modal"));
-        return;
-      }
-      
-      // Here we would handle the API call to join a class
-      toast({
-        title: "Class joined",
-        description: "You have successfully joined this class",
-      });
-    } catch (error) {
-      toast({
-        title: "Failed to join class",
-        description: "There was an error joining this class. Please try again.",
-        variant: "destructive",
-      });
+  // Filter classes based on current filters
+  const [filteredClasses, setFilteredClasses] = useState<Class[]>([]);
+  const [paginatedClasses, setPaginatedClasses] = useState<Class[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Update filtered classes when data changes
+  useEffect(() => {
+    if (classes) {
+      setFilteredClasses(classes);
+      setCurrentPage(1);
     }
+  }, [classes]);
+
+  // Update pagination
+  useEffect(() => {
+    if (filteredClasses) {
+      const totalItems = filteredClasses.length;
+      const calculatedTotalPages = Math.ceil(totalItems / itemsPerPage);
+      setTotalPages(calculatedTotalPages || 1);
+
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setPaginatedClasses(filteredClasses.slice(startIndex, endIndex));
+    }
+  }, [filteredClasses, currentPage, itemsPerPage]);
+
+  const handleSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    refetch();
   };
-  
-  // Filter classes based on search and filters
-  const filteredClasses = classes?.filter((classItem) => {
-    const matchesSearch = searchTerm 
-      ? classItem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        classItem.description.toLowerCase().includes(searchTerm.toLowerCase())
-      : true;
-      
-    const matchesCategory = selectedCategory === "all" 
-      ? true 
-      : classItem.category === selectedCategory;
-      
-    const matchesLevel = selectedLevel === "all" 
-      ? true 
-      : classItem.level.toLowerCase() === selectedLevel;
-      
-    return matchesSearch && matchesCategory && matchesLevel;
-  });
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setCategory("");
+    setLanguage("");
+    setLevel("");
+    refetch();
+  };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Helmet>
-        <title>Classes | GlobalEduConnect</title>
-        <meta name="description" content="Browse and join live educational classes from teachers around the world." />
-      </Helmet>
+    <div className="min-h-screen flex flex-col">
+      <Header />
       
-      <Header user={user} />
-      
-      <main className="flex-grow container mx-auto px-4 py-6">
-        <section className="py-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-8">Explore Classes</h1>
+      <main className="flex-1 py-8 px-4 md:px-8">
+        <div className="container max-w-7xl">
+          <div className="space-y-4 mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Classes</h1>
+            <p className="text-muted-foreground max-w-3xl">
+              Browse through our diverse range of global classes taught by experienced educators from around the world. Use the filters to find the perfect class for your learning journey.
+            </p>
+          </div>
           
-          {/* Filters and Search */}
-          <div className="bg-white rounded-lg shadow-md p-4 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="col-span-1 md:col-span-2">
-                <Input
-                  placeholder="Search classes..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <Select
-                  value={selectedCategory}
-                  onValueChange={setSelectedCategory}
-                >
+          {/* Search and Filters */}
+          <div className="mb-8 bg-card border rounded-lg p-4 shadow-sm">
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="relative">
+                  <Input
+                    placeholder="Search classes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                </div>
+                
+                <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger>
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="computer-science">Computer Science</SelectItem>
+                    <SelectItem value="">All Categories</SelectItem>
                     <SelectItem value="mathematics">Mathematics</SelectItem>
                     <SelectItem value="science">Science</SelectItem>
                     <SelectItem value="languages">Languages</SelectItem>
                     <SelectItem value="arts">Arts</SelectItem>
+                    <SelectItem value="technology">Technology</SelectItem>
                     <SelectItem value="business">Business</SelectItem>
+                    <SelectItem value="humanities">Humanities</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <Select
-                  value={selectedLevel}
-                  onValueChange={setSelectedLevel}
-                >
+                
+                <Select value={language} onValueChange={setLanguage}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Languages</SelectItem>
+                    <SelectItem value="english">English</SelectItem>
+                    <SelectItem value="spanish">Spanish</SelectItem>
+                    <SelectItem value="french">French</SelectItem>
+                    <SelectItem value="german">German</SelectItem>
+                    <SelectItem value="chinese">Chinese</SelectItem>
+                    <SelectItem value="japanese">Japanese</SelectItem>
+                    <SelectItem value="arabic">Arabic</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <Select value={level} onValueChange={setLevel}>
                   <SelectTrigger>
                     <SelectValue placeholder="Level" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
+                    <SelectItem value="">All Levels</SelectItem>
                     <SelectItem value="beginner">Beginner</SelectItem>
                     <SelectItem value="intermediate">Intermediate</SelectItem>
                     <SelectItem value="advanced">Advanced</SelectItem>
+                    <SelectItem value="expert">Expert</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </div>
-          
-          {/* Classes List */}
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, index) => (
-                <div key={index} className="flex flex-col space-y-3">
-                  <Skeleton className="h-40 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <div className="flex justify-between">
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-8 w-16" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="bg-red-50 p-6 rounded-md text-red-600 text-center">
-              <p>Error loading classes. Please try again later.</p>
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => window.location.reload()}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : !filteredClasses || filteredClasses.length === 0 ? (
-            <div className="bg-blue-50 p-6 rounded-md text-blue-600 text-center">
-              <p>No classes found matching your criteria.</p>
-              {(searchTerm || selectedCategory !== "all" || selectedLevel !== "all") && (
-                <Button 
-                  variant="outline" 
-                  className="mt-4"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedCategory("all");
-                    setSelectedLevel("all");
-                  }}
-                >
+              
+              <div className="flex justify-between">
+                <Button variant="outline" type="button" onClick={clearFilters}>
                   Clear Filters
                 </Button>
-              )}
+                <Button type="submit">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Apply Filters
+                </Button>
+              </div>
+            </form>
+          </div>
+          
+          {/* Class Listings */}
+          {isLoading ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
             </div>
+          ) : paginatedClasses.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {paginatedClasses.map((classItem) => (
+                  <Card key={classItem.id} className="overflow-hidden flex flex-col h-full">
+                    <div className="h-48 bg-primary/10 flex items-center justify-center">
+                      {classItem.thumbnail ? (
+                        <img 
+                          src={classItem.thumbnail} 
+                          alt={classItem.title} 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <BookOpen className="h-16 w-16 text-primary/40" />
+                      )}
+                    </div>
+                    <CardHeader>
+                      <CardTitle>{classItem.title}</CardTitle>
+                      <CardDescription>
+                        {classItem.category} • {classItem.level}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <p className="line-clamp-2 text-muted-foreground">
+                        {classItem.description}
+                      </p>
+                      {classItem.startTime && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          <span className="font-medium">Starts: </span>
+                          {new Date(classItem.startTime).toLocaleString()}
+                        </div>
+                      )}
+                    </CardContent>
+                    <CardFooter className="flex justify-between border-t pt-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-muted-foreground">
+                          {classItem.isLive ? "Live Class" : "Recorded Class"}
+                        </span>
+                        {classItem.price ? (
+                          <span className="font-medium">
+                            {classItem.price} {classItem.currency || "USD"}
+                          </span>
+                        ) : (
+                          <span className="font-medium text-green-600 dark:text-green-500">
+                            Free
+                          </span>
+                        )}
+                      </div>
+                      <Button asChild>
+                        <Link href={`/classes/${classItem.id}`}>
+                          View Class
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <Pagination className="my-8">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      />
+                    </PaginationItem>
+                    
+                    {Array.from({ length: totalPages }).map((_, index) => (
+                      <PaginationItem key={index}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(index + 1)}
+                          isActive={currentPage === index + 1}
+                        >
+                          {index + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )).slice(
+                      Math.max(0, currentPage - 3),
+                      Math.min(totalPages, currentPage + 2)
+                    )}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredClasses.map((classItem) => (
-                <ClassCard 
-                  key={classItem.id} 
-                  classData={classItem} 
-                  onJoin={handleJoinClass} 
-                />
-              ))}
+            <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
+              <BookOpen className="h-16 w-16 text-muted-foreground/30" />
+              <h3 className="text-lg font-medium">No Classes Found</h3>
+              <p className="text-muted-foreground max-w-md">
+                We couldn't find any classes matching your search criteria. Try adjusting your filters or check back later.
+              </p>
+              <Button onClick={clearFilters}>Clear All Filters</Button>
             </div>
           )}
-        </section>
+        </div>
       </main>
-      
-      <Footer />
     </div>
   );
-};
-
-export default Classes;
+}
