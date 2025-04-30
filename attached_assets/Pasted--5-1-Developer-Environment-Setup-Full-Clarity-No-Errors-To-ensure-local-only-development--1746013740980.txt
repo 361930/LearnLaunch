@@ -1,0 +1,140 @@
+## 5.1 Developer Environment Setup (Full Clarity & No Errors)
+
+To ensure **local-only development** without relying on cloud hosting or third-party services beyond Firebase, follow these clear steps:
+
+### 🔧 Languages & Technologies Used
+- **Frontend**: React Native (JavaScript/TypeScript)  
+- **Navigation**: React Navigation  
+- **API Client**: Axios  
+- **Authentication**: JWT-based  
+- **Database (Local Backend)**: Node.js with Express  
+- **Firebase**: Only for Realtime Chat & Notifications (configured locally using your Firebase credentials)
+
+---
+
+## 5.2 Backend Setup (Local-Only)
+
+> ⚠️ **Important:** You must set up and run the backend API **on your own laptop**. Do not use any hosted services.
+
+**Folder Structure**:
+global-edu-connect/ └── local-api-server/
+
+pgsql
+Copy
+Edit
+
+### `local-api-server/package.json`
+```json
+{
+  "name": "globaledu-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.0",
+    "body-parser": "^1.20.2"
+  }
+}
+local-api-server/.env
+env
+Copy
+Edit
+PORT=5000
+JWT_SECRET=yourSuperSecretKey
+local-api-server/index.js
+js
+Copy
+Edit
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Auth endpoints
+app.post('/auth/register', (req, res) => {
+  console.log('Register:', req.body);
+  res.status(200).send({ token: 'fake-jwt-token', role: req.body.role });
+});
+
+app.post('/auth/login', (req, res) => {
+  console.log('Login:', req.body);
+  res.status(200).send({ token: 'fake-jwt-token', role: req.body.role });
+});
+
+// Start server
+app.listen(PORT, () => console.log(`API Server running at http://localhost:${PORT}`));
+5.3 Assigning the Database (Local Only)
+⚠️ You are not using any cloud database.
+
+Simple Testing: The fake backend above mimics login/register without a real DB.
+
+Full Local Persistence:
+
+Option A: Use JSON files.
+
+Option B: Integrate SQLite:
+
+Backend: better-sqlite3
+
+Frontend: react-native-sqlite-storage
+
+5.4 Connecting App to Local Backend
+Update .env in global-edu-connect/:
+
+env
+Copy
+Edit
+API_URL=http://localhost:5000
+Verify in src/api/index.ts:
+
+ts
+Copy
+Edit
+const api = axios.create({
+  baseURL: process.env.API_URL || 'http://localhost:5000'
+});
+5.5 File-by-File Action Guide
+
+File	Task
+src/screens/LoginScreen.tsx	Build login form (email/password). On submit, call api.post('/auth/login'). Store JWT in AsyncStorage.
+src/screens/RegisterScreen.tsx	Build register form. Call api.post('/auth/register'). Store JWT, then navigate based on role claim.
+src/screens/DashboardStudent.tsx	Fetch enrolled classes from backend or local JSON. Display progress bars and recommendations.
+src/screens/DashboardTeacher.tsx	Display created classes, enrollment stats. Add UI to create new classes (persist in memory or SQLite).
+src/screens/ClassListScreen.tsx	Fetch all classes. Implement pagination with FlatList and lazy-loading (infinite scroll).
+src/screens/ClassDetailScreen.tsx	Show class info: title, description, schedule calendar, join/enroll button.
+src/screens/DiscussionScreen.tsx	Integrate Firebase Realtime DB: load and post messages, show timestamps, implement read receipts.
+src/screens/ProfileScreen.tsx	Enable profile picture upload (use react-native-image-picker), bio editing, and logout button.
+src/seed/demoUsers.ts	Define hidden demo accounts with roles:
+ts
+Copy
+Edit
+export const demoUsers = [
+  { role: 'student', email: 'demo.student@globaledu.io', password: 'Student123!' },
+  { role: 'teacher', email: 'demo.teacher@globaledu.io', password: 'Teacher123!' }
+];
+``` |
+| `seed.js`                           | Automatically POST each user in `demoUsers` to `/auth/register` with `isDemo: true`.                                                        |
+| `.env`                              | Must contain `API_URL=http://localhost:5000`. Exclude from VCS.                                                                              |
+| `App.tsx`                           | On launch, read JWT from storage. If present, verify and navigate to `AppStack`; else to `AuthStack`.                                        |
+| `src/api/index.ts`                  | Axios interceptor to attach `Authorization: Bearer <token>` from `AsyncStorage`.                                                              |
+
+---
+
+### Next Steps
+
+- Copy this snippet into your document.  
+- Ensure your local backend is running before launching the React Native app.  
+- Follow file guide precisely to implement each feature without error.  
+- Happy coding!  

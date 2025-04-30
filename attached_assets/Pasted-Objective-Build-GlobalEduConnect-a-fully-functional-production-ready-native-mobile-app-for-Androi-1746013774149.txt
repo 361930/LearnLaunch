@@ -1,0 +1,142 @@
+Objective: Build GlobalEduConnect, a fully functional, production-ready native mobile app for Android and iOS, plus a local-only backend server—no cloud hosting except Firebase for chat/notifications.
+
+1. Tech Stack & Languages
+Mobile App: React Native with TypeScript
+
+Navigation: React Navigation
+
+UI: React Native core components + React Native Paper
+
+State & Data Fetching: Axios + React Query
+
+Storage: AsyncStorage (or SecureStore for tokens)
+
+Backend API (Local): Node.js + Express (JavaScript)
+
+Auth: JWT (jsonwebtoken + bcryptjs)
+
+Data Persistence (choose one):
+
+Simple JSON files (in-memory / file read-write)
+
+SQLite (better-sqlite3 for Node; react-native-sqlite-storage for RN)
+
+Realtime Chat & Push Notifications: Firebase (Firebase SDK configured locally with your credentials)
+
+Testing: Jest for unit tests; React Native Testing Library for component tests
+
+2. Local-Only Backend Setup
+Create folder local-api-server/ alongside the app.
+
+package.json, .env, index.js as specified in section 5.2 snippet.
+
+Implement endpoints:
+
+POST /auth/register → hash password, issue JWT ({ token, role })
+
+POST /auth/login → verify credentials, issue JWT
+
+CRUD for classes: /classes (list, create, update, delete)
+
+Optional: /discussion/:classId/messages for fallback if Firebase is down
+
+Use file-based or SQLite storage—no cloud DB.
+
+3. App Configuration
+Add .env in global-edu-connect/:
+
+env
+Copy
+Edit
+API_URL=http://localhost:5000
+In src/api/index.ts, configure Axios with baseURL = process.env.API_URL and JWT interceptor reading from AsyncStorage.
+
+4. File-by-File Implementation Tasks
+Implement each file exactly as follows:
+
+
+File	Responsibilities
+src/screens/LoginScreen.tsx	• Build form with Input & Button.
+• Validate inputs.	
+• On submit: await api.post('/auth/login', { email, password }).	
+• On success: store token & role in AsyncStorage; navigate to AppStack.	
+src/screens/RegisterScreen.tsx	• Build registration form (email, password, role selector).
+• On submit: await api.post('/auth/register', { email, password, role }).	
+• On success: same token storage & navigation.	
+src/screens/DashboardStudent.tsx	• Fetch /classes?enrolled=true.
+• Display FlatList of classes with progress bars.	
+• Show recommended courses under fetched /classes?recommended=true.	
+src/screens/DashboardTeacher.tsx	• Fetch /classes?createdBy=self.
+• Display list with enrollment counts.	
+• Provide “Create Class” button: opens a form, posts to /classes.	
+src/screens/ClassListScreen.tsx	• Fetch /classes with pagination (page, limit query).
+• Implement infinite scroll via onEndReached.	
+src/screens/ClassDetailScreen.tsx	• Fetch /classes/:id.
+• Show title, description, schedule (calendar view).	
+• “Join” button posts to /classes/:id/join.	
+src/screens/DiscussionScreen.tsx	• Integrate Firebase: listen on messages/{classId} node.
+• Display messages with timestamps; input to send new messages.	
+• Implement read receipts and scrolling to newest message.	
+src/screens/ProfileScreen.tsx	• Fetch /users/me.
+• Allow editing name, bio, profile pic (react-native-image-picker).	
+• POST changes to /users/me.	
+• “Logout” clears AsyncStorage and navigates to AuthStack.	
+src/seed/demoUsers.ts	Define two hidden accounts:
+ts
+Copy
+Edit
+export const demoUsers = [
+  { role:'student', email:'demo.student@globaledu.io', password:'Student123!' },
+  { role:'teacher', email:'demo.teacher@globaledu.io', password:'Teacher123!' }
+];
+``` |
+| **`seed.js`**                          | Iterate and POST each demo user to `/auth/register?isDemo=true`.                                                                             |
+| **`App.tsx`**                          | • On mount: read `token` from storage, validate by calling `/auth/me`.  
+• If valid: set user context & navigate to `AppStack`; else to `AuthStack`.                                       |
+| **`src/api/index.ts`**                 | • Axios instance with JWT interceptor.  
+• Retry once on 401 to redirect to login.                                                                                 |
+
+---
+
+### 5. UI/UX & Feature Enhancements  
+- **Design System:** Define a color palette, typography scale, 8-point grid. Use React Native Paper theming.  
+- **Onboarding:** 3-screen carousel explaining: “Learn anywhere,” “Teach anything,” “Join communities.”  
+- **Search:** Global search icon in header → fetch `/classes?search=…`.  
+- **Filters:** By subject, language, difficulty.  
+- **Gamification:**  
+  - Award badges for first class completion, 5 messages posted, etc.  
+  - Show badge icons on `DashboardStudent`.  
+- **Ratings & Reviews:**  
+  - After completing a class (simulate with a button), prompt student to rate 1–5 and write a review.  
+  - Display average on `ClassListScreen`.  
+- **Offline Support:**  
+  - Use React Query’s cache + AsyncStorage persistence for `/classes` results and recent chat.  
+- **Loading/Errors:**  
+  - Global `Loading` component with spinner.  
+  - `ErrorBoundary` wrapper in `App.tsx` to catch crashes.  
+- **Accessibility:**  
+  - Ensure all touchables ≥44×44 dp.  
+  - Add `accessibilityLabel` for images/buttons.  
+  - Support dynamic font sizing.  
+  - High-contrast light/dark themes.  
+
+---
+
+### 6. Security & Testing  
+- Store JWT in SecureStore (iOS Keychain / Android Keystore).  
+- Input validation on client before sending.  
+- Use `express-rate-limit` on backend auth routes.  
+- Write **Jest** unit tests for:  
+  - Auth API client.  
+  - Navigation flows (Auth vs. AppStack).  
+  - Key components (Login, ClassList).  
+
+---
+
+### 7. Deployment & Delivery  
+- **Android:** Configure `android/app/src/main/res/mipmap-*` icons and `android/app/src/main/res/drawable/splash.xml`.  
+- **iOS:** Add app icons and launch storyboard in Xcode.  
+- Automate builds with a simple shell script or GitHub Actions:  
+  - `npm run build:android` → `android/app/build/outputs/bundle/release/app.aab`  
+  - `npm run build:ios` → `.ipa` via `xcodebuild`  
+- Bundle & zip final project, include `.env.example` and `seed.js`.  
