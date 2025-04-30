@@ -1,0 +1,98 @@
+You are an expert at understanding complex application requirements and generating detailed feature breakdowns.
+
+**Context:**
+
+The application is named "GlobalEduConnect," a global public education platform designed to connect students and teachers worldwide. It features role-based access, class scheduling, reporting, and donation systems. The application should be built with a mobile-first approach, a responsive design, and a modern, interactive user interface. It will be important to keep in mind security and privacy.
+
+**Application Overview:**
+
+GlobalEduConnect is a web and mobile platform that enables students to join live public classes and teachers to host them. It facilitates a global educational community with features for user management, live class scheduling, content reporting, and a donation system.
+
+**User Roles:**
+
+1.  **Students:**
+    *   Can sign up/log in using email or Google accounts.
+    *   Must provide at least their name, enrolled subjects, and interests in their profile.
+    *   Can manage their profile's privacy settings (public, private, semi-public).
+    *   Can view a shared schedule/calendar of live public classes.
+    *   Can join live public classes.
+    *   Can donate to teachers ("Buy Me a Coffee" functionality) or directly to the admin.
+    *   Can report violations (abuse, bad behavior, etc.).
+
+2.  **Teachers:**
+    *   Must register using a detailed form that includes their field of expertise, level of knowledge, and an optional teaching demo (video or file).
+    *   Can manage their profile visibility settings (public or visible only to admin).
+    *   Can host live classes that are open to students worldwide.
+    *   Must adhere to community guidelines and maintain good ratings.
+    *   Can make their profile anonymous/private if community guidelines are met.
+    *   Have a "Buy Me a Coffee" donation button on their profile.
+
+3.  **Admin:**
+    *   Can view, approve, or reject teacher applications.
+    *   Has access to class logs (session times, teachers, attendees).
+    *   Can monitor reports and overall user activity.
+    *   Can receive donations from users.
+    *   Moderates flagged accounts and ensures community safety.
+
+**Core Features and Functionality:**
+
+1.  **Authentication and Authorization:**
+    *   Implement a dual role-based login/signup for students and teachers.
+    *   Support email and Google account login/signup.
+    *   Upon signup, pre-populate the profile with minimal required information.
+    *   Implement user profile controls, allowing users to manage their data visibility.
+
+2.  **Class Scheduling:**
+    *   Create a class calendar and schedule overview for upcoming live sessions.
+    *   Allow students to join live classes.
+    *   Allow teachers to host live classes.
+
+3.  **Reporting System:**
+    *   Implement a system for reporting violations (abuse, bad behavior, etc.).
+    *   Include abuse filters for reported content.
+    *   Store reports for admin review.
+
+4.  **Donation System:**
+    *   Enable students to donate to teachers using a "Buy Me a Coffee" feature.
+    *   Enable users to donate directly to the admin.
+
+5. **Admin Panel**
+   * Give the ability to the admin to be able to access all data and have control over user and application.
+
+**Security and Privacy:**
+
+*   Implement end-to-end encryption for meetings, chats, and stored data.
+*   Users should have control over how much personal information is displayed.
+*   No personal data should be shared with other users unless explicitly permitted by the user.
+*   Admins can review sessions and applications for moderation purposes only.
+* Have political neutrality by blocking some region, like Israel for example.
+
+**UI/UX and Visual Design:**
+
+*   Modern and interactive UI with smooth animations.
+*   Clean layout and responsive design.
+*   Mobile-first design approach that seamlessly adapts to different screen sizes and devices.
+*   Utilize advanced graphics, elegant transitions, and visually engaging components.
+*   Seamless navigation with animation-based feedback for user actions.
+* Use blue as primary color, white as secondary color and grey as accent.
+* Use Luciole font for all text.
+* Design a unique icon set featuring a globe emerging from an open book.
+
+**Community Guidelines**
+
+*   No abusive/hate speech.
+*   Use moderate/respectful language.
+*   Political neutrality.
+*   Admin has the final say on violations.
+
+**Task:**
+
+Based on the detailed information provided, generate a detailed list of user stories, features, and functionalities required for the GlobalEduConnect application. Ensure that your output aligns with the described user roles, core features, security guidelines, and UI/UX requirements.
+
+**Output Requirements**
+
+1. **User Stories:** Create a comprehensive set of user stories, formatted as "As a \[user role], I want to \[goal], so that \[benefit]."
+2. **Feature Breakdown:** Provide a detailed breakdown of the features required for the application, including their functionality and the user roles they serve.
+3. **Technical Requirements:** List any specific technical requirements (e.g., database, encryption, API integrations).
+4. **UI/UX Specifications:** Give a description of how some UI/UX should be designed, like the login page.
+5. **Security Checklist** Describe the necessary security measures that the application should have.
