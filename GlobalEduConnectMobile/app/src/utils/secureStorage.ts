@@ -1,127 +1,164 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-type StorageOptions = {
-  requireAuthentication?: boolean;
-};
+import { Platform } from 'react-native';
 
 /**
- * SecureStorage utility for securely storing sensitive data
+ * SecureStorage utility provides a unified API for storing sensitive data
+ * on both native mobile platforms and web.
  * 
- * Uses Expo SecureStore which stores data in the Keychain (iOS) 
- * or in EncryptedSharedPreferences (Android)
- * 
- * Falls back to AsyncStorage when running in environments where 
- * SecureStore is not available (e.g. web, dev mode without Expo)
+ * On native platforms, it uses Expo's SecureStore which provides
+ * encrypted storage. On web, it falls back to AsyncStorage.
  */
-class SecureStorage {
-  private static readonly useSecureStore = true;
-  private static readonly SECURE_STORE_PREFIX = 'edu_connect_secure_';
 
+// Check if running on a native platform
+const isNative = Platform.OS !== 'web';
+
+// Set a reasonable maximum value size
+const MAX_VALUE_SIZE = 2000;
+
+// Interface for SecureStorage
+interface ISecureStorage {
+  setItem(key: string, value: string): Promise<void>;
+  getItem(key: string): Promise<string | null>;
+  removeItem(key: string): Promise<void>;
+  clear(): Promise<void>;
+}
+
+/**
+ * A class providing secure storage functionality with web fallback.
+ */
+class SecureStorage implements ISecureStorage {
   /**
    * Store a value securely
+   * 
+   * @param key Storage key
+   * @param value Value to store
+   * @returns Promise that resolves when the operation completes
    */
-  static async setItem(
-    key: string, 
-    value: string, 
-    options: StorageOptions = {}
-  ): Promise<void> {
-    const storageKey = this.getStorageKey(key);
-
+  async setItem(key: string, value: string): Promise<void> {
     try {
-      if (this.useSecureStore) {
-        await SecureStore.setItemAsync(storageKey, value, {
-          requireAuthentication: options.requireAuthentication || false,
-          keychainAccessible: SecureStore.WHEN_UNLOCKED,
-        });
+      // Validate value length
+      if (value && value.length > MAX_VALUE_SIZE) {
+        throw new Error(`Value for ${key} exceeds maximum size (${value.length} > ${MAX_VALUE_SIZE})`);
+      }
+      
+      if (isNative) {
+        // Use SecureStore on native platforms
+        await SecureStore.setItemAsync(key, value);
       } else {
-        // Fallback to AsyncStorage with key prefix
-        await AsyncStorage.setItem(storageKey, value);
+        // Use AsyncStorage on web
+        await AsyncStorage.setItem(key, value);
       }
     } catch (error) {
-      console.error(`SecureStorage setItem error for key ${key}:`, error);
-      // Fallback to AsyncStorage if SecureStore fails
-      await AsyncStorage.setItem(storageKey, value);
+      console.error(`Error storing ${key}:`, error);
+      throw new Error(`Failed to store ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
    * Retrieve a value from secure storage
+   * 
+   * @param key Storage key
+   * @returns Promise that resolves with the stored value, or null if not found
    */
-  static async getItem(key: string): Promise<string | null> {
-    const storageKey = this.getStorageKey(key);
-
+  async getItem(key: string): Promise<string | null> {
     try {
-      if (this.useSecureStore) {
-        return await SecureStore.getItemAsync(storageKey);
+      if (isNative) {
+        // Use SecureStore on native platforms
+        return await SecureStore.getItemAsync(key);
       } else {
-        // Fallback to AsyncStorage with key prefix
-        return await AsyncStorage.getItem(storageKey);
+        // Use AsyncStorage on web
+        return await AsyncStorage.getItem(key);
       }
     } catch (error) {
-      console.error(`SecureStorage getItem error for key ${key}:`, error);
-      // Fallback to AsyncStorage if SecureStore fails
-      return await AsyncStorage.getItem(storageKey);
+      console.error(`Error retrieving ${key}:`, error);
+      throw new Error(`Failed to retrieve ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Delete a value from secure storage
+   * Remove a value from secure storage
+   * 
+   * @param key Storage key
+   * @returns Promise that resolves when the operation completes
    */
-  static async removeItem(key: string): Promise<void> {
-    const storageKey = this.getStorageKey(key);
-
+  async removeItem(key: string): Promise<void> {
     try {
-      if (this.useSecureStore) {
-        await SecureStore.deleteItemAsync(storageKey);
+      if (isNative) {
+        // Use SecureStore on native platforms
+        await SecureStore.deleteItemAsync(key);
       } else {
-        // Fallback to AsyncStorage with key prefix
-        await AsyncStorage.removeItem(storageKey);
+        // Use AsyncStorage on web
+        await AsyncStorage.removeItem(key);
       }
     } catch (error) {
-      console.error(`SecureStorage removeItem error for key ${key}:`, error);
-      // Try fallback to AsyncStorage if SecureStore fails
-      await AsyncStorage.removeItem(storageKey);
+      console.error(`Error removing ${key}:`, error);
+      throw new Error(`Failed to remove ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Clear all secure values with our prefix
-   * Note: This is limited in SecureStore since we can't enumerate keys,
-   * so we can only clear keys that we know about
+   * Clear all items from secure storage
+   * This is intentionally not implemented for SecureStore
+   * as it doesn't provide a clear all method. AsyncStorage is used on web.
+   * 
+   * @returns Promise that resolves when the operation completes
    */
-  static async clear(knownKeys: string[] = []): Promise<void> {
+  async clear(): Promise<void> {
     try {
-      if (this.useSecureStore) {
-        // Remove each known key
-        for (const key of knownKeys) {
-          await SecureStore.deleteItemAsync(this.getStorageKey(key));
-        }
+      if (isNative) {
+        // SecureStore doesn't have a clearAll method
+        // We would need to maintain a list of keys to clear
+        console.warn('clear() is not fully supported on native platforms');
       } else {
-        // Get all keys from AsyncStorage
-        const allKeys = await AsyncStorage.getAllKeys();
-        
-        // Filter keys that have our prefix
-        const secureKeys = allKeys.filter(
-          key => key.startsWith(this.SECURE_STORE_PREFIX)
-        );
-        
-        // Remove all secure keys
-        if (secureKeys.length > 0) {
-          await AsyncStorage.multiRemove(secureKeys);
-        }
+        // Use AsyncStorage on web
+        await AsyncStorage.clear();
       }
     } catch (error) {
-      console.error('SecureStorage clear error:', error);
+      console.error('Error clearing secure storage:', error);
+      throw new Error(`Failed to clear storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Format the storage key with our prefix
+   * Store an object securely by serializing it to JSON
+   * 
+   * @param key Storage key
+   * @param value Object to store
+   * @returns Promise that resolves when the operation completes
    */
-  private static getStorageKey(key: string): string {
-    return `${this.SECURE_STORE_PREFIX}${key}`;
+  async setObject<T>(key: string, value: T): Promise<void> {
+    try {
+      const jsonValue = JSON.stringify(value);
+      await this.setItem(key, jsonValue);
+    } catch (error) {
+      console.error(`Error storing object ${key}:`, error);
+      throw new Error(`Failed to store object ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Retrieve and parse an object from secure storage
+   * 
+   * @param key Storage key
+   * @returns Promise that resolves with the parsed object, or null if not found
+   */
+  async getObject<T>(key: string): Promise<T | null> {
+    try {
+      const jsonValue = await this.getItem(key);
+      
+      if (!jsonValue) {
+        return null;
+      }
+      
+      return JSON.parse(jsonValue) as T;
+    } catch (error) {
+      console.error(`Error retrieving object ${key}:`, error);
+      throw new Error(`Failed to retrieve object ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 
-export default SecureStorage;
+// Create and export a singleton instance
+const secureStorage = new SecureStorage();
+export default secureStorage;

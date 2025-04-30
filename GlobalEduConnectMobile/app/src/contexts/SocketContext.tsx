@@ -1,179 +1,210 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAuth } from './AuthContext';
+import { SOCKET_URL } from '../config/constants';
+import secureStorage from '../utils/secureStorage';
 import { useToast } from './ToastContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
+import { Platform } from 'react-native';
 
-// Define the URL of your Socket.IO server
-const SOCKET_URL = process.env.SOCKET_URL || 'http://localhost:3001';
-
-interface SocketContextProps {
+interface SocketContextType {
   socket: Socket | null;
-  isConnected: boolean;
-  lastError: Error | null;
-  connect: () => void;
-  disconnect: () => void;
-  joinRoom: (roomId: string) => void;
-  leaveRoom: (roomId: string) => void;
-  emit: (event: string, data: any) => void;
+  connected: boolean;
+  connecting: boolean;
+  error: Error | null;
+  joinClassRoom: (classId: number) => void;
+  leaveClassRoom: (classId: number) => void;
+  sendClassMessage: (classId: number, message: string) => void;
 }
 
-const SocketContext = createContext<SocketContextProps>({
-  socket: null,
-  isConnected: false,
-  lastError: null,
-  connect: () => {},
-  disconnect: () => {},
-  joinRoom: () => {},
-  leaveRoom: () => {},
-  emit: () => {},
-});
+const SocketContext = createContext<SocketContextType | null>(null);
 
-export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function useSocket() {
+  const context = useContext(SocketContext);
+  if (!context) {
+    throw new Error('useSocket must be used within a SocketProvider');
+  }
+  return context;
+}
+
+interface SocketProviderProps {
+  children: React.ReactNode;
+}
+
+export function SocketProvider({ children }: SocketProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastError, setLastError] = useState<Error | null>(null);
-  const { user } = useAuth();
+  const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const { showToast } = useToast();
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
+  const { user, isAuthenticated } = useAuth();
 
-  // Connect to socket when context is mounted if user is authenticated
+  // Initialize socket connection when authenticated
   useEffect(() => {
-    if (user) {
-      connect();
-    }
-    return () => {
-      disconnect();
-    };
-  }, [user]);
+    let socketInstance: Socket | null = null;
 
-  // Function to connect to socket.io server
-  const connect = async () => {
-    if (socket?.connected) return;
+    const connectSocket = async () => {
+      try {
+        setConnecting(true);
+        setError(null);
 
-    try {
-      // Get auth token from AsyncStorage
-      const token = await AsyncStorage.getItem('authToken');
+        // Get authentication token
+        const token = await secureStorage.getItem('auth_token');
+        
+        if (!token || !isAuthenticated) {
+          // Don't connect if not authenticated
+          setConnecting(false);
+          return;
+        }
 
-      if (!token) {
-        throw new Error('Authentication token not found');
+        // Create socket instance with auth
+        socketInstance = io(SOCKET_URL, {
+          auth: { token },
+          transports: ['websocket'], 
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          timeout: 10000,
+        });
+
+        // Set up event handlers
+        socketInstance.on('connect', () => {
+          console.log('Socket connected');
+          setConnected(true);
+          setConnecting(false);
+          setError(null);
+        });
+
+        socketInstance.on('connect_error', (err) => {
+          console.error('Socket connection error:', err);
+          setConnected(false);
+          setConnecting(false);
+          setError(err);
+          
+          // Show error toast only on web (mobile already has NetInfo alerts)
+          if (Platform.OS === 'web') {
+            showToast({
+              type: 'error',
+              message: 'Connection error. Please check your internet connection.',
+            });
+          }
+        });
+
+        socketInstance.on('disconnect', (reason) => {
+          console.log('Socket disconnected:', reason);
+          setConnected(false);
+          
+          if (reason === 'io server disconnect') {
+            // Server disconnected us, need to reconnect manually
+            socketInstance?.connect();
+          }
+        });
+
+        socketInstance.on('error', (err) => {
+          console.error('Socket error:', err);
+          setError(err);
+          showToast({
+            type: 'error',
+            message: err.message || 'Connection error occurred',
+          });
+        });
+
+        // Set socket in state
+        setSocket(socketInstance);
+      } catch (err) {
+        console.error('Error setting up socket:', err);
+        setConnecting(false);
+        setConnected(false);
+        setError(err instanceof Error ? err : new Error('Unknown socket error'));
       }
+    };
 
-      // Connect with auth token
-      const socketInstance = io(SOCKET_URL, {
-        transports: ['websocket'],
-        auth: {
-          token
-        },
-        reconnection: true,
-        reconnectionAttempts: maxReconnectAttempts,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-      });
-
-      // Set up event listeners
-      socketInstance.on('connect', () => {
-        setIsConnected(true);
-        setLastError(null);
-        reconnectAttempts.current = 0;
-        console.log('Socket connected successfully');
-      });
-
-      socketInstance.on('connect_error', (err) => {
-        console.error('Socket connection error:', err);
-        setLastError(err);
-        
-        reconnectAttempts.current += 1;
-        if (reconnectAttempts.current >= maxReconnectAttempts) {
-          showToast(
-            'Unable to establish real-time connection. Chat will work in offline mode.',
-            'error'
-          );
-          socketInstance.disconnect();
-        }
-      });
-
-      socketInstance.on('disconnect', (reason) => {
-        console.log('Socket disconnected:', reason);
-        setIsConnected(false);
-        
-        if (reason === 'io server disconnect') {
-          // The server has forced the disconnect, need to reconnect manually
-          socketInstance.connect();
-        }
-      });
-
-      socketInstance.on('error', (err) => {
-        console.error('Socket error:', err);
-        setLastError(new Error(err.message || 'Unknown socket error'));
-        showToast('Connection error: ' + (err.message || 'Unknown error'), 'error');
-      });
-
-      setSocket(socketInstance);
-    } catch (err) {
-      console.error('Error setting up socket connection:', err);
-      setLastError(err instanceof Error ? err : new Error('Unknown error setting up socket'));
-      showToast('Failed to connect to chat server', 'error');
+    if (isAuthenticated && user) {
+      connectSocket();
     }
-  };
 
-  // Function to disconnect from socket
-  const disconnect = () => {
-    if (socket) {
-      socket.disconnect();
-      setSocket(null);
-      setIsConnected(false);
-    }
-  };
+    // Cleanup function
+    return () => {
+      if (socketInstance) {
+        console.log('Disconnecting socket');
+        socketInstance.disconnect();
+        setSocket(null);
+        setConnected(false);
+      }
+    };
+  }, [isAuthenticated, user, showToast]);
 
-  // Function to join a room (typically a class discussion)
-  const joinRoom = (roomId: string) => {
-    if (socket && isConnected) {
-      socket.emit('join_room', { roomId });
-      console.log('Joined room:', roomId);
-    } else {
-      console.warn('Cannot join room: socket not connected');
+  // Join a class chat room
+  const joinClassRoom = useCallback((classId: number) => {
+    if (!socket || !connected) {
+      showToast({
+        type: 'error',
+        message: 'Socket not connected. Cannot join room.',
+      });
+      return;
     }
-  };
 
-  // Function to leave a room
-  const leaveRoom = (roomId: string) => {
-    if (socket && isConnected) {
-      socket.emit('leave_room', { roomId });
-      console.log('Left room:', roomId);
-    }
-  };
+    const roomId = `class_${classId}`;
+    socket.emit('join_room', { roomId });
+    
+    console.log(`Joining room: ${roomId}`);
+  }, [socket, connected, showToast]);
 
-  // Function to emit events
-  const emit = (event: string, data: any) => {
-    if (socket && isConnected) {
-      socket.emit(event, data);
-    } else {
-      console.warn(`Cannot emit ${event}: socket not connected`);
-      setLastError(new Error('Not connected to chat server'));
+  // Leave a class chat room
+  const leaveClassRoom = useCallback((classId: number) => {
+    if (!socket || !connected) return;
+
+    const roomId = `class_${classId}`;
+    socket.emit('leave_room', { roomId });
+    
+    console.log(`Leaving room: ${roomId}`);
+  }, [socket, connected]);
+
+  // Send a message to a class chat
+  const sendClassMessage = useCallback((classId: number, message: string) => {
+    if (!socket || !connected) {
+      showToast({
+        type: 'error',
+        message: 'Socket not connected. Cannot send message.',
+      });
+      return;
     }
-  };
+
+    if (!message.trim()) {
+      showToast({
+        type: 'error',
+        message: 'Cannot send empty message',
+      });
+      return;
+    }
+
+    const roomId = `class_${classId}`;
+    socket.emit('send_message', { roomId, message });
+    
+    console.log(`Message sent to room ${roomId}: ${message}`);
+  }, [socket, connected, showToast]);
+
+  // Socket context value
+  const value = useMemo(() => ({
+    socket,
+    connected,
+    connecting,
+    error,
+    joinClassRoom,
+    leaveClassRoom,
+    sendClassMessage,
+  }), [
+    socket,
+    connected,
+    connecting,
+    error,
+    joinClassRoom,
+    leaveClassRoom,
+    sendClassMessage,
+  ]);
 
   return (
-    <SocketContext.Provider
-      value={{
-        socket,
-        isConnected,
-        lastError,
-        connect,
-        disconnect,
-        joinRoom,
-        leaveRoom,
-        emit,
-      }}
-    >
+    <SocketContext.Provider value={value}>
       {children}
     </SocketContext.Provider>
   );
-};
-
-export const useSocket = () => useContext(SocketContext);
-
-export default SocketContext;
+}

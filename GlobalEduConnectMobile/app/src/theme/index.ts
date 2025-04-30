@@ -1,264 +1,400 @@
-import { DefaultTheme as PaperDefaultTheme, DarkTheme as PaperDarkTheme } from 'react-native-paper';
-import { DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
-import { Dimensions } from 'react-native';
+/**
+ * GlobalEduConnect Theme System
+ * 
+ * A comprehensive theming system with light and dark mode support.
+ * Includes colors, typography, spacing, border radius, and shadows.
+ */
 
-// 8-point spacing grid
-export const spacing = {
+// Font families
+const fontFamilies = {
+  regular: 'System',
+  medium: 'System-Medium',
+  semiBold: 'System-SemiBold',
+  bold: 'System-Bold',
+};
+
+// Base sizes for typography
+const baseTypography = {
+  fontFamilies,
+  weights: {
+    regular: '400',
+    medium: '500',
+    semiBold: '600',
+    bold: '700',
+  },
+  sizes: {
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 20,
+    xxl: 24,
+    xxxl: 32,
+    display: 40,
+  },
+  lineHeights: {
+    tight: 1.2,
+    normal: 1.5,
+    relaxed: 1.8,
+  },
+};
+
+// Shared spacing system
+const baseSpacing = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 16,
   lg: 24,
   xl: 32,
-  xxl: 40,
+  xxl: 48,
+  xxxl: 64,
 };
 
-// Screen dimensions utility
-export const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Check if device is a tablet
-export const isTablet = SCREEN_WIDTH >= 768;
-
-// Breakpoints
-export const breakpoints = {
-  phone: 0,
-  tablet: 768,
+// Shared border radius
+const baseBorderRadius = {
+  none: 0,
+  xs: 2,
+  sm: 4,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  round: 9999,
 };
 
-// Color palette
-const colors = {
-  // Primary
-  primary: '#4C6EF5',
-  primaryDark: '#3B5BD9',
-  primaryLight: '#7B93F9',
-
-  // Secondary
-  secondary: '#FF6B6B',
-  secondaryDark: '#E05252',
-  secondaryLight: '#FF9999',
-
-  // Neutrals
-  black: '#000000',
-  darkGrey: '#333333',
-  mediumGrey: '#666666',
-  lightGrey: '#CCCCCC',
-  offWhite: '#F9FAFB',
+// Light theme colors
+const lightColors = {
+  // Primary brand colors
+  primary: '#0074E4',
+  primaryLight: '#0A84FF',
+  primaryDark: '#0059B3',
+  
+  // Secondary brand colors
+  secondary: '#8A54FF',
+  secondaryLight: '#A578FF',
+  secondaryDark: '#6E35E3',
+  
+  // Accent colors
+  accent: '#FF6B00',
+  accentLight: '#FF8A3D',
+  accentDark: '#E04D00',
+  
+  // Semantic & Feedback colors
+  success: '#26A869',
+  successLight: '#30BF7A',
+  successDark: '#1C8C55',
+  
+  warning: '#F9A825',
+  warningLight: '#FFB547',
+  warningDark: '#DA8C13',
+  
+  error: '#DC3545',
+  errorLight: '#E25563',
+  errorDark: '#B72C3A',
+  
+  info: '#0288D1',
+  infoLight: '#29A1E6',
+  infoDark: '#0277BD',
+  
+  // Neutral colors
   white: '#FFFFFF',
-
-  // Status 
-  success: '#4CAF50',
-  successLight: '#A5D6A7',
-  warning: '#FFCC5C',
-  warningLight: '#FFE082',
-  error: '#F44336',
-  errorLight: '#EF9A9A',
-  info: '#2196F3',
-  infoLight: '#90CAF9',
-
-  // Misc
-  accent: '#FF9900',
-  transparent: 'transparent',
+  gray50: '#F9FAFB',
+  gray100: '#F3F4F6',
+  gray200: '#E5E7EB',
+  gray300: '#D1D5DB',
+  gray400: '#9CA3AF',
+  gray500: '#6B7280',
+  gray600: '#4B5563',
+  gray700: '#374151',
+  gray800: '#1F2937',
+  gray900: '#111827',
+  black: '#000000',
+  
+  // Functional colors
+  text: '#111827',
+  textSecondary: '#4B5563',
+  textTertiary: '#6B7280',
+  textDisabled: '#9CA3AF',
+  textInverse: '#FFFFFF',
+  
+  background: '#FFFFFF',
+  backgroundSecondary: '#F9FAFB',
+  backgroundTertiary: '#F3F4F6',
+  
+  border: '#E5E7EB',
+  borderStrong: '#D1D5DB',
+  
+  // Special cases
   overlay: 'rgba(0, 0, 0, 0.5)',
+  shadow: 'rgba(0, 0, 0, 0.1)',
 };
 
 // Dark theme colors
 const darkColors = {
-  // Primary
-  primary: '#5D7BF7',
-  primaryDark: '#3B5BD9',
-  primaryLight: '#7B93F9',
-
-  // Secondary
-  secondary: '#FF7B7B',
-  secondaryDark: '#E05252',
-  secondaryLight: '#FF9999',
-
-  // Neutrals
-  black: '#FFFFFF',
-  darkGrey: '#EEEEEE',
-  mediumGrey: '#AAAAAA',
-  lightGrey: '#555555',
-  offWhite: '#222222',
-  white: '#121212',
-
-  // Status
-  success: '#66BB6A',
-  successLight: '#81C784',
-  warning: '#FFCA28',
-  warningLight: '#FFD54F',
-  error: '#EF5350',
-  errorLight: '#E57373',
-  info: '#42A5F5',
-  infoLight: '#64B5F6',
-
-  // Misc
-  accent: '#FFAB40',
-  transparent: 'transparent',
-  overlay: 'rgba(0, 0, 0, 0.75)',
+  // Primary brand colors
+  primary: '#0A84FF',
+  primaryLight: '#42A5FF',
+  primaryDark: '#0064D1',
+  
+  // Secondary brand colors
+  secondary: '#9D6AFF',
+  secondaryLight: '#B68CFF',
+  secondaryDark: '#8450EB',
+  
+  // Accent colors
+  accent: '#FF8C30',
+  accentLight: '#FFA05C',
+  accentDark: '#E47A1D',
+  
+  // Semantic & Feedback colors
+  success: '#30BF7A',
+  successLight: '#48D892',
+  successDark: '#26A869',
+  
+  warning: '#FFB547',
+  warningLight: '#FFCA7A',
+  warningDark: '#F0A62A',
+  
+  error: '#F25767',
+  errorLight: '#F57A87',
+  errorDark: '#D43D4D',
+  
+  info: '#29A1E6',
+  infoLight: '#51B6F0',
+  infoDark: '#0288D1',
+  
+  // Neutral colors
+  white: '#FFFFFF',
+  gray50: '#F9FAFB',
+  gray100: '#F3F4F6',
+  gray200: '#E5E7EB',
+  gray300: '#D1D5DB',
+  gray400: '#9CA3AF',
+  gray500: '#6B7280',
+  gray600: '#4B5563',
+  gray700: '#374151',
+  gray800: '#1F2937',
+  gray900: '#111827',
+  black: '#000000',
+  
+  // Functional colors
+  text: '#FFFFFF',
+  textSecondary: '#D1D5DB',
+  textTertiary: '#9CA3AF',
+  textDisabled: '#6B7280',
+  textInverse: '#111827',
+  
+  background: '#121212',
+  backgroundSecondary: '#1F1F1F',
+  backgroundTertiary: '#2C2C2C',
+  
+  border: '#383838',
+  borderStrong: '#505050',
+  
+  // Special cases
+  overlay: 'rgba(0, 0, 0, 0.7)',
+  shadow: 'rgba(0, 0, 0, 0.3)',
 };
 
-// Typography
-export const typography = {
-  h1: {
-    fontSize: isTablet ? 40 : 32,
-    fontWeight: 'bold',
-    lineHeight: isTablet ? 48 : 40,
+// Light theme shadow definitions
+const lightShadows = {
+  none: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
-  h2: {
-    fontSize: isTablet ? 32 : 28,
-    fontWeight: 'bold',
-    lineHeight: isTablet ? 40 : 36,
+  xs: {
+    shadowColor: lightColors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  h3: {
-    fontSize: isTablet ? 28 : 24,
-    fontWeight: 'bold',
-    lineHeight: isTablet ? 36 : 32,
+  sm: {
+    shadowColor: lightColors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  h4: {
-    fontSize: isTablet ? 24 : 20,
-    fontWeight: 'bold',
-    lineHeight: isTablet ? 32 : 28,
+  md: {
+    shadowColor: lightColors.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  h5: {
-    fontSize: isTablet ? 20 : 18,
-    fontWeight: 'bold',
-    lineHeight: isTablet ? 28 : 24,
+  lg: {
+    shadowColor: lightColors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    elevation: 8,
   },
-  h6: {
-    fontSize: isTablet ? 18 : 16,
-    fontWeight: 'bold',
-    lineHeight: isTablet ? 24 : 22,
+  xl: {
+    shadowColor: lightColors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 12,
   },
-  subtitle1: {
-    fontSize: isTablet ? 16 : 14,
-    fontWeight: '600',
-    lineHeight: isTablet ? 22 : 20,
+};
+
+// Dark theme shadow definitions (stronger to stand out more in dark mode)
+const darkShadows = {
+  none: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
-  subtitle2: {
-    fontSize: isTablet ? 14 : 12,
-    fontWeight: '600',
-    lineHeight: isTablet ? 20 : 18,
+  xs: {
+    shadowColor: darkColors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  sm: {
+    shadowColor: darkColors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: darkColors.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: darkColors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  xl: {
+    shadowColor: darkColors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 12,
+  },
+};
+
+// Typography objects with component specific styles
+const typography = {
+  ...baseTypography,
+  heading1: {
+    fontFamily: fontFamilies.bold,
+    fontSize: baseTypography.sizes.xxxl,
+    fontWeight: baseTypography.weights.bold,
+    lineHeight: baseTypography.lineHeights.tight,
+  },
+  heading2: {
+    fontFamily: fontFamilies.bold,
+    fontSize: baseTypography.sizes.xxl,
+    fontWeight: baseTypography.weights.bold,
+    lineHeight: baseTypography.lineHeights.tight,
+  },
+  heading3: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: baseTypography.sizes.xl,
+    fontWeight: baseTypography.weights.semiBold,
+    lineHeight: baseTypography.lineHeights.tight,
+  },
+  heading4: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: baseTypography.sizes.lg,
+    fontWeight: baseTypography.weights.semiBold,
+    lineHeight: baseTypography.lineHeights.tight,
+  },
+  heading5: {
+    fontFamily: fontFamilies.medium,
+    fontSize: baseTypography.sizes.md,
+    fontWeight: baseTypography.weights.medium,
+    lineHeight: baseTypography.lineHeights.tight,
+  },
+  heading6: {
+    fontFamily: fontFamilies.medium,
+    fontSize: baseTypography.sizes.sm,
+    fontWeight: baseTypography.weights.medium,
+    lineHeight: baseTypography.lineHeights.tight,
   },
   body1: {
-    fontSize: isTablet ? 16 : 14,
-    fontWeight: 'normal',
-    lineHeight: isTablet ? 24 : 22,
+    fontFamily: fontFamilies.regular,
+    fontSize: baseTypography.sizes.md,
+    fontWeight: baseTypography.weights.regular,
+    lineHeight: baseTypography.lineHeights.normal,
   },
   body2: {
-    fontSize: isTablet ? 14 : 12,
-    fontWeight: 'normal',
-    lineHeight: isTablet ? 20 : 18,
-  },
-  caption: {
-    fontSize: isTablet ? 12 : 10,
-    fontWeight: 'normal',
-    lineHeight: isTablet ? 16 : 14,
+    fontFamily: fontFamilies.regular,
+    fontSize: baseTypography.sizes.sm,
+    fontWeight: baseTypography.weights.regular,
+    lineHeight: baseTypography.lineHeights.normal,
   },
   button: {
-    fontSize: isTablet ? 16 : 14,
-    fontWeight: '600',
-    lineHeight: isTablet ? 24 : 22,
+    fontFamily: fontFamilies.medium,
+    fontSize: baseTypography.sizes.md,
+    fontWeight: baseTypography.weights.medium,
+    lineHeight: baseTypography.lineHeights.tight,
+  },
+  caption: {
+    fontFamily: fontFamilies.regular,
+    fontSize: baseTypography.sizes.xs,
+    fontWeight: baseTypography.weights.regular,
+    lineHeight: baseTypography.lineHeights.normal,
+  },
+  overline: {
+    fontFamily: fontFamilies.medium,
+    fontSize: baseTypography.sizes.xs,
+    fontWeight: baseTypography.weights.medium,
+    lineHeight: baseTypography.lineHeights.normal,
     textTransform: 'uppercase',
   },
 };
 
-// Border radius
-export const borderRadius = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  round: 9999,
-};
+// Export the theme interface
+export interface Theme {
+  colors: typeof lightColors;
+  typography: typeof typography;
+  spacing: typeof baseSpacing;
+  borderRadius: typeof baseBorderRadius;
+  shadows: typeof lightShadows;
+}
 
-// Shadows
-export const shadows = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.18,
-    shadowRadius: 1.0,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-    elevation: 3,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 6,
-  },
-  xl: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.44,
-    shadowRadius: 10.32,
-    elevation: 10,
-  },
-};
-
-// Light theme configuration
-export const LightTheme = {
-  ...NavigationDefaultTheme,
-  ...PaperDefaultTheme,
-  colors: {
-    ...NavigationDefaultTheme.colors,
-    ...PaperDefaultTheme.colors,
-    primary: colors.primary,
-    accent: colors.accent,
-    background: colors.offWhite,
-    surface: colors.white,
-    card: colors.white,
-    text: colors.darkGrey,
-    error: colors.error,
-    disabled: colors.lightGrey,
-    placeholder: colors.mediumGrey,
-    notification: colors.secondary,
-    border: colors.lightGrey,
-
-    // Custom colors for our use
-    ...colors,
-  },
+// Export light theme
+export const lightTheme: Theme = {
+  colors: lightColors,
   typography,
-  spacing,
-  borderRadius,
-  shadows,
-  dark: false,
+  spacing: baseSpacing,
+  borderRadius: baseBorderRadius,
+  shadows: lightShadows,
 };
 
-// Dark theme configuration
-export const DarkTheme = {
-  ...NavigationDarkTheme,
-  ...PaperDarkTheme,
-  colors: {
-    ...NavigationDarkTheme.colors,
-    ...PaperDarkTheme.colors,
-    primary: darkColors.primary,
-    accent: darkColors.accent,
-    background: darkColors.offWhite,
-    surface: darkColors.white,
-    card: darkColors.white,
-    text: darkColors.darkGrey,
-    error: darkColors.error,
-    disabled: darkColors.lightGrey,
-    placeholder: darkColors.mediumGrey,
-    notification: darkColors.secondary,
-    border: darkColors.lightGrey,
-
-    // Custom colors for our use
-    ...darkColors,
-  },
+// Export dark theme
+export const darkTheme: Theme = {
+  colors: darkColors,
   typography,
-  spacing,
-  borderRadius,
-  shadows,
-  dark: true,
+  spacing: baseSpacing,
+  borderRadius: baseBorderRadius,
+  shadows: darkShadows,
 };
 
-export type Theme = typeof LightTheme;
+// Helper functions to access theme properties
+export const getColor = (theme: Theme, color: keyof Theme['colors']) => theme.colors[color];
+export const getSpacing = (theme: Theme, spacing: keyof Theme['spacing']) => theme.spacing[spacing];
+export const getBorderRadius = (theme: Theme, radius: keyof Theme['borderRadius']) => theme.borderRadius[radius];
+export const getShadow = (theme: Theme, shadow: keyof Theme['shadows']) => theme.shadows[shadow];
+
+// Default export for easy importing
+export default {
+  light: lightTheme,
+  dark: darkTheme,
+};
