@@ -1,103 +1,108 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useColorScheme, StatusBar, ColorSchemeName } from 'react-native';
-import secureStorage from '../utils/secureStorage';
-import { THEME_PREFERENCE_KEY } from '../config/constants';
-import { lightTheme, darkTheme, Theme } from '../theme';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { Appearance, ColorSchemeName, useColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { lightTheme, darkTheme, highContrastTheme, Theme, ThemeMode } from '../theme';
 
-// Theme mode options
-type ThemeMode = 'light' | 'dark' | 'system';
-
-// Theme context interface
-interface ThemeContextType {
+// Theme context type
+export interface ThemeContextType {
   theme: Theme;
-  isDark: boolean;
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
-  colors: Theme['colors'];
-  spacing: Theme['spacing'];
-  typography: Theme['typography'];
-  borderRadius: Theme['borderRadius'];
-  shadows: Theme['shadows'];
+  isLoading: boolean;
 }
 
-// Create the context
+// Create context
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-// Props for the theme provider
+// Theme provider props
 interface ThemeProviderProps {
-  children: React.ReactNode;
-  initialThemeMode?: ThemeMode;
+  children: ReactNode;
 }
 
-export function ThemeProvider({
-  children,
-  initialThemeMode = 'system',
-}: ThemeProviderProps) {
-  // Get the device color scheme
-  const deviceColorScheme = useColorScheme();
+// Storage key for theme preference
+const THEME_STORAGE_KEY = 'gec_theme_preference';
+
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  // System color scheme
+  const systemColorScheme = useColorScheme();
   
-  // Theme mode state
-  const [themeMode, setThemeModeState] = useState<ThemeMode>(initialThemeMode);
+  // Theme state
+  const [theme, setTheme] = useState<Theme>(lightTheme);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // Determine if we're using dark mode
-  const isDark = themeMode === 'system' 
-    ? deviceColorScheme === 'dark'
-    : themeMode === 'dark';
-  
-  // Get the active theme
-  const theme = isDark ? darkTheme : lightTheme;
-  
-  // Save the theme preference to storage
-  const saveThemePreference = useCallback(async (mode: ThemeMode) => {
-    try {
-      await secureStorage.setItem(THEME_PREFERENCE_KEY, mode);
-    } catch (error) {
-      console.error('Failed to save theme preference:', error);
-    }
-  }, []);
-  
-  // Set the theme mode and save the preference
-  const setThemeMode = useCallback((mode: ThemeMode) => {
-    setThemeModeState(mode);
-    saveThemePreference(mode);
-  }, [saveThemePreference]);
-  
-  // Load saved theme preference on mount
+  // Load saved theme preference
   useEffect(() => {
     const loadThemePreference = async () => {
       try {
-        const savedTheme = await secureStorage.getItem(THEME_PREFERENCE_KEY);
-        if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
-          setThemeModeState(savedTheme as ThemeMode);
+        const savedThemeMode = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        if (savedThemeMode) {
+          setThemeModeState(savedThemeMode as ThemeMode);
         }
       } catch (error) {
-        console.error('Failed to load theme preference:', error);
+        console.error('Error loading theme preference:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     
     loadThemePreference();
   }, []);
   
-  // Update status bar based on theme
+  // Listen for system theme changes when using 'system' mode
   useEffect(() => {
-    StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content');
-    // For Android
-    if (StatusBar.setBackgroundColor) {
-      StatusBar.setBackgroundColor(theme.colors.background);
+    if (themeMode === 'system') {
+      const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+        updateThemeBasedOnMode(themeMode, colorScheme);
+      });
+      
+      return () => {
+        subscription.remove();
+      };
     }
-  }, [isDark, theme]);
+  }, [themeMode]);
+  
+  // Update theme when themeMode changes
+  useEffect(() => {
+    updateThemeBasedOnMode(themeMode, systemColorScheme);
+  }, [themeMode, systemColorScheme]);
+  
+  // Set theme mode and save preference
+  const setThemeMode = async (mode: ThemeMode) => {
+    try {
+      await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
+      setThemeModeState(mode);
+    } catch (error) {
+      console.error('Error saving theme preference:', error);
+    }
+  };
+  
+  // Update the active theme based on the selected mode and system preferences
+  const updateThemeBasedOnMode = (mode: ThemeMode, systemMode: ColorSchemeName) => {
+    switch (mode) {
+      case 'light':
+        setTheme(lightTheme);
+        break;
+      case 'dark':
+        setTheme(darkTheme);
+        break;
+      case 'high-contrast':
+        setTheme(highContrastTheme);
+        break;
+      case 'system':
+      default:
+        // Use system preference or fallback to light
+        setTheme(systemMode === 'dark' ? darkTheme : lightTheme);
+        break;
+    }
+  };
   
   // Context value
   const contextValue: ThemeContextType = {
     theme,
-    isDark,
     themeMode,
     setThemeMode,
-    colors: theme.colors,
-    spacing: theme.spacing,
-    typography: theme.typography,
-    borderRadius: theme.borderRadius,
-    shadows: theme.shadows,
+    isLoading,
   };
   
   return (
@@ -105,10 +110,10 @@ export function ThemeProvider({
       {children}
     </ThemeContext.Provider>
   );
-}
+};
 
-// Hook to use the theme
-export function useTheme() {
+// Custom hook for using the theme context
+export const useTheme = () => {
   const context = useContext(ThemeContext);
   
   if (!context) {
@@ -116,4 +121,16 @@ export function useTheme() {
   }
   
   return context;
+};
+
+// HOC to inject theme into class components
+export function withTheme<P>(
+  Component: React.ComponentType<P & { theme: Theme }>
+): React.FC<P> {
+  return (props: P) => {
+    const { theme } = useTheme();
+    return <Component {...props} theme={theme} />;
+  };
 }
+
+export default ThemeContext;

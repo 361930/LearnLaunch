@@ -1,142 +1,53 @@
-import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+/**
+ * Network-aware QueryClient for GlobalEduConnect
+ * 
+ * Provides features:
+ * - Offline caching and persistence
+ * - Automatic retry on reconnection
+ * - Network status detection
+ * - Optimistic updates
+ */
+
+import { useState, useEffect } from 'react';
+import { 
+  QueryClient, 
+  QueryClientProvider, 
+  useMutation, 
+  useQuery,
+  useInfiniteQuery,
+  MutationOptions,
+  UseMutationOptions,
+  UseQueryOptions,
+  UseInfiniteQueryOptions
+} from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios, { AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import { Platform } from 'react-native';
 import { API_URL } from '../config/constants';
 import secureStorage from './secureStorage';
 
-// Network state tracking
-let isConnected: boolean = true;
-
-// Create axios instance
+// Default axios instance for API requests
 const axiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Create AsyncStorage persister for offline support
-const asyncStoragePersister = createAsyncStoragePersister({
-  storage: AsyncStorage,
-  key: 'gec_query_cache',
-  throttleTime: 1000, // Save cache at most once per second
-  serialize: data => JSON.stringify(data),
-  deserialize: data => JSON.parse(data),
-});
-
-// Query error handler
-const handleQueryError = (error: unknown) => {
-  // Format error message
-  let message = 'An unexpected error occurred';
-  
-  // Handle Axios errors
-  if (error instanceof AxiosError) {
-    // Network errors
-    if (error.code === 'ECONNABORTED') {
-      message = 'Request timed out. Please try again.';
-    } else if (!error.response) {
-      message = 'Network error. Please check your connection.';
-    } else {
-      // API errors with responses
-      const status = error.response.status;
-      
-      if (status === 401) {
-        message = 'Your session has expired. Please log in again.';
-      } else if (status === 403) {
-        message = 'You do not have permission to perform this action.';
-      } else if (status === 404) {
-        message = 'The requested resource was not found.';
-      } else if (status === 429) {
-        message = 'Too many requests. Please try again later.';
-      } else if (status >= 500) {
-        message = 'Server error. Please try again later.';
-      } else if (error.response.data?.error) {
-        // Use server-provided error if available
-        message = error.response.data.error;
-      }
-    }
-  }
-  
-  console.error(`Query error: ${message}`, error);
-  
-  // Return formatted error
-  return new Error(message);
-};
-
-// Mutation error handler
-const handleMutationError = (error: unknown) => {
-  // This uses the same logic as query errors for consistency
-  return handleQueryError(error);
-};
-
-// Create query client
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: (failureCount, error: any) => {
-        // Don't retry on 401, 403, 404
-        if (error?.response?.status >= 400 && error?.response?.status < 500) {
-          return false;
-        }
-        
-        // Only retry a few times for other errors
-        return failureCount < 2 && isConnected;
-      },
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      cacheTime: 1000 * 60 * 60 * 24, // 24 hours
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
-      refetchOnMount: true,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
-    },
-    mutations: {
-      retry: false,
-      onError: handleMutationError,
-    },
-  },
-  queryCache: new QueryCache({
-    onError: handleQueryError,
-  }),
-  mutationCache: new MutationCache({
-    onError: handleMutationError,
-  }),
-});
-
-// Initialize network state listener
-export const initializeNetworkMonitoring = () => {
-  // Subscribe to network state changes
-  const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
-    const newConnectionState = Boolean(state.isConnected);
-    
-    // Only trigger change if state actually changed
-    if (isConnected !== newConnectionState) {
-      isConnected = newConnectionState;
-      console.log(`Network connectivity changed: ${isConnected ? 'online' : 'offline'}`);
-      
-      // Refetch queries when coming back online
-      if (isConnected) {
-        queryClient.invalidateQueries();
-      }
-    }
-  });
-  
-  return unsubscribe;
-};
-
-// Axios request interceptor to add auth token
+// Request interceptor to add auth token
 axiosInstance.interceptors.request.use(
   async (config) => {
-    try {
-      const token = await secureStorage.getItem('auth_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (error) {
-      console.error('Error setting auth token:', error);
+    // Get auth token from secure storage
+    const token = await secureStorage.getItem('auth_token');
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    
     return config;
   },
   (error) => {
@@ -144,19 +55,40 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// Axios response interceptor for common error handling
+// Response interceptor for error handling
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    return response;
+  },
   async (error) => {
-    // Handle token expiration (401)
-    if (error.response?.status === 401) {
+    const originalRequest = error.config;
+    
+    // Handle token refresh if needed
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
       try {
-        // Clear user session if token is rejected
-        await secureStorage.removeItem('auth_token');
-        await secureStorage.removeItem('user_data');
-        // Clearing the user will trigger a redirection to login in the Auth context
-      } catch (storageError) {
-        console.error('Error clearing auth data:', storageError);
+        // Get refresh token
+        const refreshToken = await secureStorage.getItem('refresh_token');
+        
+        if (refreshToken) {
+          // Call token refresh endpoint
+          const response = await axiosInstance.post('/auth/refresh', {
+            refreshToken,
+          });
+          
+          // Store new tokens
+          await secureStorage.setItem('auth_token', response.data.accessToken);
+          await secureStorage.setItem('refresh_token', response.data.refreshToken);
+          
+          // Update authorization header
+          originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
+          
+          // Retry original request
+          return axiosInstance(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
       }
     }
     
@@ -164,41 +96,223 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// API request function
-export const apiRequest = async <T = any>(
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-  endpoint: string,
-  data?: any,
-  config?: AxiosRequestConfig
-): Promise<T> => {
-  try {
-    const response = await axiosInstance({
-      method,
-      url: endpoint,
-      data: ['POST', 'PUT', 'PATCH'].includes(method) ? data : undefined,
-      params: method === 'GET' ? data : undefined,
-      ...config,
+// Create a QueryClient with default settings optimized for mobile use
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2, // Retry failed queries twice
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 30 * 60 * 1000, // 30 minutes
+      refetchOnWindowFocus: Platform.OS === 'web', // Only refetch on focus on web
+      refetchOnReconnect: true, // Refetch when reconnecting
+      refetchOnMount: true, // Refetch when component mounts
+      onError: (error) => {
+        console.error('Query error:', error);
+      },
+    },
+    mutations: {
+      retry: 1, // Only retry mutations once
+      onError: (error) => {
+        console.error('Mutation error:', error);
+      },
+    },
+  },
+});
+
+// Create persister for offline support
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: 'GEC_QUERY_CACHE',
+  throttleTime: 1000, // Throttle writes to storage
+  serialize: (data) => JSON.stringify(data),
+  deserialize: (cachedString) => JSON.parse(cachedString),
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week in milliseconds
+});
+
+/**
+ * Custom hook to manage network status
+ * @returns Object with network status information
+ */
+export function useNetworkStatus() {
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [netInfo, setNetInfo] = useState<NetInfoState | null>(null);
+  
+  useEffect(() => {
+    // Subscribe to network info updates
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsOnline(Boolean(state.isConnected));
+      setNetInfo(state);
     });
     
-    return response.data;
+    // Get initial network state
+    NetInfo.fetch().then((state) => {
+      setIsOnline(Boolean(state.isConnected));
+      setNetInfo(state);
+    });
+    
+    // Unsubscribe on cleanup
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+  
+  return { isOnline, netInfo };
+}
+
+/**
+ * Network-aware QueryClient Provider component
+ */
+export function NetworkAwareQueryClientProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: asyncStoragePersister,
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) => {
+            // Don't persist error states
+            return !query.state.error;
+          },
+        },
+      }}
+    >
+      {children}
+    </PersistQueryClientProvider>
+  );
+}
+
+/**
+ * Helper function to make API requests
+ * @param method - The HTTP method
+ * @param url - API endpoint URL
+ * @param data - Request data (for POST, PUT, PATCH)
+ * @param config - Additional axios config
+ * @returns Promise with response
+ */
+export async function apiRequest<T = any>(
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  url: string,
+  data?: any,
+  config?: AxiosRequestConfig
+): Promise<AxiosResponse<T>> {
+  try {
+    switch (method) {
+      case 'GET':
+        return axiosInstance.get<T>(url, config);
+      case 'POST':
+        return axiosInstance.post<T>(url, data, config);
+      case 'PUT':
+        return axiosInstance.put<T>(url, data, config);
+      case 'PATCH':
+        return axiosInstance.patch<T>(url, data, config);
+      case 'DELETE':
+        return axiosInstance.delete<T>(url, config);
+      default:
+        throw new Error(`Unsupported method: ${method}`);
+    }
   } catch (error) {
-    throw handleQueryError(error);
+    // Enhance error with additional information
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      if (axiosError.response) {
+        console.error(
+          `API Error: ${method} ${url} failed with status ${axiosError.response.status}`,
+          axiosError.response.data
+        );
+      } else if (axiosError.request) {
+        console.error(`API Error: No response received for ${method} ${url}`);
+      } else {
+        console.error(`API Error: ${axiosError.message}`);
+      }
+    } else {
+      console.error(`API Error: ${method} ${url} failed`, error);
+    }
+    
+    throw error;
   }
-};
+}
 
-// Default fetch function for react-query
-export const defaultFetcher = async <T = any>({ queryKey }: { queryKey: string[] }): Promise<T> => {
-  const [endpoint, params] = queryKey;
-  return apiRequest<T>('GET', endpoint, params);
-};
+/**
+ * Custom hook for network-aware queries
+ */
+export function useNetworkAwareQuery<
+  TQueryFnData = unknown,
+  TError = Error,
+  TData = TQueryFnData,
+>(
+  queryKey: unknown[],
+  queryFn: () => Promise<TQueryFnData>,
+  options?: UseQueryOptions<TQueryFnData, TError, TData>
+) {
+  const { isOnline } = useNetworkStatus();
+  
+  return useQuery<TQueryFnData, TError, TData>({
+    queryKey,
+    queryFn,
+    ...options,
+    // Disable network requests when offline
+    networkMode: isOnline ? 'online' : 'always',
+    // Only show stale data when offline
+    staleTime: isOnline ? options?.staleTime : Infinity,
+  });
+}
 
-// Optimistic update helper
-export const optimisticUpdate = <T>(
-  queryKey: string[],
-  updateFn: (oldData: T | undefined) => T
-) => {
-  queryClient.setQueryData<T>(queryKey, oldData => updateFn(oldData));
-};
+/**
+ * Custom hook for network-aware infinite queries
+ */
+export function useNetworkAwareInfiniteQuery<
+  TQueryFnData = unknown,
+  TError = Error,
+  TData = TQueryFnData,
+>(
+  queryKey: unknown[],
+  queryFn: any,
+  options?: UseInfiniteQueryOptions<TQueryFnData, TError, TData>
+) {
+  const { isOnline } = useNetworkStatus();
+  
+  return useInfiniteQuery<TQueryFnData, TError, TData>({
+    queryKey,
+    queryFn,
+    ...options,
+    // Disable network requests when offline
+    networkMode: isOnline ? 'online' : 'always',
+    // Only show stale data when offline
+    staleTime: isOnline ? options?.staleTime : Infinity,
+  });
+}
 
-export { asyncStoragePersister };
-export default { queryClient, apiRequest, defaultFetcher, optimisticUpdate, initializeNetworkMonitoring };
+/**
+ * Custom hook for network-aware mutations
+ */
+export function useNetworkAwareMutation<
+  TData = unknown,
+  TError = Error,
+  TVariables = void,
+  TContext = unknown,
+>(
+  mutationFn: (variables: TVariables) => Promise<TData>,
+  options?: UseMutationOptions<TData, TError, TVariables, TContext>
+) {
+  const { isOnline } = useNetworkStatus();
+  
+  return useMutation<TData, TError, TVariables, TContext>({
+    mutationFn,
+    ...options,
+    // Queue mutations when offline
+    networkMode: isOnline ? 'online' : 'always',
+    retry: isOnline ? options?.retry : 3, // More retries when offline
+    retryDelay: options?.retryDelay || ((attempt) => Math.min(1000 * 2 ** attempt, 30000)),
+  });
+}
+
+export default {
+  queryClient,
+  NetworkAwareQueryClientProvider,
+  useNetworkStatus,
+  useNetworkAwareQuery,
+  useNetworkAwareInfiniteQuery,
+  useNetworkAwareMutation,
+  apiRequest,
+};

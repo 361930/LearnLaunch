@@ -1,44 +1,54 @@
 /**
  * Authentication middleware for GlobalEduConnect API Server
  * 
- * Provides JWT-based authentication and authorization:
- * - Token validation
+ * Provides authentication and authorization utilities:
+ * - JWT token verification
  * - Role-based access control
- * - User verification
+ * - User session management
  */
 
 const jwt = require('jsonwebtoken');
-const { getUserById } = require('../services/users');
+const userService = require('../services/users');
 
-// JWT secret key - in production, use an environment variable
-// For local development/testing, we use a fixed secret
-const JWT_SECRET = process.env.JWT_SECRET || 'globaleduconnect-local-secret-key';
-const JWT_EXPIRES_IN = '7d'; // Token expiration time
+// Secret for JWT signing (in real-world, this would be in environment variables)
+const JWT_SECRET = 'GlobalEduConnect_JWT_Secret_2023';
+const JWT_EXPIRES_IN = '24h';
+const REFRESH_TOKEN_EXPIRES_IN = '30d';
 
 /**
- * Create a new JWT token for a user
- * 
- * @param {Object} user - User object to encode in token
- * @returns {string} Generated JWT token
+ * Create a JWT token for a user
+ * @param {Object} user - User object
+ * @returns {string} JWT token
  */
 function createToken(user) {
-  // Create payload with essential user information
   const payload = {
     id: user.id,
     username: user.username,
-    email: user.email,
     role: user.role,
+    // Don't include sensitive data in the token
   };
   
-  // Sign and return token
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
 /**
+ * Create a refresh token for a user
+ * @param {Object} user - User object
+ * @returns {string} Refresh token
+ */
+function createRefreshToken(user) {
+  const payload = {
+    id: user.id,
+    tokenType: 'refresh'
+  };
+  
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+}
+
+/**
  * Verify a JWT token
- * 
- * @param {string} token - JWT token to verify
- * @returns {Object|null} Decoded token payload or null if invalid
+ * @param {string} token - JWT token
+ * @returns {Object|null} Decoded token payload or null
  */
 function verifyToken(token) {
   try {
@@ -50,46 +60,44 @@ function verifyToken(token) {
 }
 
 /**
- * Extract token from request headers
- * 
+ * Get token from authorization header
  * @param {Object} req - Express request object
- * @returns {string|null} Extracted token or null if not found
+ * @returns {string|null} JWT token or null
  */
-function extractTokenFromHeader(req) {
+function getTokenFromRequest(req) {
   const authHeader = req.headers.authorization;
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7); // Remove 'Bearer ' prefix
   }
   
-  return authHeader.split(' ')[1];
+  return null;
 }
 
 /**
- * Middleware to validate authentication
+ * Authentication middleware
+ * Verifies JWT token and attaches user to request
  * 
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next middleware function
  */
-async function validateAuth(req, res, next) {
+async function authenticate(req, res, next) {
+  const token = getTokenFromRequest(req);
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  const decoded = verifyToken(token);
+  
+  if (!decoded) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
   try {
-    // Extract token from header
-    const token = extractTokenFromHeader(req);
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    
-    // Verify token
-    const decoded = verifyToken(token);
-    
-    if (!decoded) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-    
     // Get user from database
-    const user = await getUserById(decoded.id);
+    const user = await userService.getUserById(decoded.id);
     
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
@@ -97,38 +105,33 @@ async function validateAuth(req, res, next) {
     
     // Check if user is active
     if (user.status !== 'active') {
-      return res.status(403).json({ 
-        error: 'Account is not active. Please contact support.'
-      });
+      return res.status(403).json({ error: 'Account is not active' });
     }
     
     // Attach user to request
     req.user = user;
+    
     next();
   } catch (error) {
     console.error('Authentication error:', error);
-    res.status(500).json({ error: 'Authentication process failed' });
+    res.status(500).json({ error: 'Authentication failed' });
   }
 }
 
 /**
- * Middleware to validate user role
+ * Role-based authorization middleware
  * 
- * @param {string[]} allowedRoles - Array of roles allowed to access the resource
- * @returns {Function} Express middleware function
+ * @param {string[]} roles - Authorized roles
+ * @returns {Function} Middleware function
  */
-function validateRole(allowedRoles) {
+function authorize(roles = []) {
   return (req, res, next) => {
-    // Ensure auth middleware ran first
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    // Check if user has allowed role
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        error: 'You do not have permission to access this resource'
-      });
+    if (roles.length && !roles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
     }
     
     next();
@@ -136,58 +139,121 @@ function validateRole(allowedRoles) {
 }
 
 /**
- * Middleware for admin-only routes
- */
-const validateAdmin = validateRole(['admin']);
-
-/**
- * Middleware for teacher and admin routes
- */
-const validateTeacherOrAdmin = validateRole(['teacher', 'admin']);
-
-/**
- * Middleware to check if user is accessing their own resource
+ * Admin authorization middleware
  * 
- * @param {Function} getResourceUserId - Function to extract user ID from request
- * @returns {Function} Express middleware function
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
  */
-function validateOwnership(getResourceUserId) {
+function isAdmin(req, res, next) {
+  return authorize(['admin'])(req, res, next);
+}
+
+/**
+ * Teacher authorization middleware
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+function isTeacher(req, res, next) {
+  return authorize(['teacher', 'admin'])(req, res, next);
+}
+
+/**
+ * Student authorization middleware
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+function isStudent(req, res, next) {
+  return authorize(['student', 'teacher', 'admin'])(req, res, next);
+}
+
+/**
+ * Resource owner middleware
+ * Checks if requested resource belongs to the authenticated user
+ * 
+ * @param {Function} getResourceOwnerId - Function to get resource owner ID
+ * @returns {Function} Middleware function
+ */
+function isResourceOwner(getResourceOwnerId) {
   return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
     try {
-      // Ensure auth middleware ran first
-      if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
+      const ownerId = await getResourceOwnerId(req);
       
       // Admin can access all resources
       if (req.user.role === 'admin') {
         return next();
       }
       
-      // Get resource owner ID using the provided function
-      const resourceUserId = await getResourceUserId(req);
-      
-      // Check if user owns the resource
-      if (req.user.id !== resourceUserId) {
-        return res.status(403).json({ 
-          error: 'You do not have permission to access this resource'
-        });
+      if (ownerId !== req.user.id) {
+        return res.status(403).json({ error: 'You do not own this resource' });
       }
       
       next();
     } catch (error) {
-      console.error('Ownership validation error:', error);
-      res.status(500).json({ error: 'Ownership validation failed' });
+      console.error('Resource authorization error:', error);
+      res.status(500).json({ error: 'Authorization failed' });
     }
   };
 }
 
+/**
+ * Refresh token middleware
+ * Handles token refresh
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function refreshToken(req, res) {
+  const { refreshToken } = req.body;
+  
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'Refresh token is required' });
+  }
+  
+  try {
+    const decoded = verifyToken(refreshToken);
+    
+    if (!decoded || decoded.tokenType !== 'refresh') {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+    
+    const user = await userService.getUserById(decoded.id);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    // Create new tokens
+    const accessToken = createToken(user);
+    const newRefreshToken = createRefreshToken(user);
+    
+    res.json({
+      accessToken,
+      refreshToken: newRefreshToken,
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({ error: 'Token refresh failed' });
+  }
+}
+
 module.exports = {
   createToken,
+  createRefreshToken,
   verifyToken,
-  validateAuth,
-  validateRole,
-  validateAdmin,
-  validateTeacherOrAdmin,
-  validateOwnership
+  authenticate,
+  authorize,
+  isAdmin,
+  isTeacher,
+  isStudent,
+  isResourceOwner,
+  refreshToken,
 };

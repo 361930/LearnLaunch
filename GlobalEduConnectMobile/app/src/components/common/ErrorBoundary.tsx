@@ -1,275 +1,243 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component, ReactNode, ErrorInfo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { Button } from 'react-native-paper';
+import * as StackTrace from 'stacktrace-js';
+import { getColor } from '../../theme';
+import { ThemeContextType, withTheme } from '../../contexts/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getColor, getShadow } from '../../theme';
-import { lightTheme } from '../../theme';
+import * as Clipboard from 'expo-clipboard';
+import { AppState, AppStateStatus } from 'react-native';
 
-// Error keys in AsyncStorage
-const ERROR_STORAGE_KEY = 'gec_error_logs';
-const MAX_STORED_ERRORS = 10;
-
-// Props for the ErrorBoundary component
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  reset?: () => void;
+  maxStackTraceLines?: number;
+  theme: ThemeContextType['theme']; // Injected from withTheme HOC
 }
 
-// State for the ErrorBoundary component
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
-  errorHistory: ErrorLogEntry[];
-  showErrorDetails: boolean;
+  parsedStackTrace: string[];
+  isExpanded: boolean;
+  isClipboardAvailable: boolean;
 }
 
-// Error log entry structure
-interface ErrorLogEntry {
-  timestamp: number;
-  message: string;
-  stack?: string;
-  componentStack?: string;
-}
-
-/**
- * ErrorBoundary component for catching and displaying errors
- * 
- * Features:
- * - Catches errors in child components
- * - Displays user-friendly error messages
- * - Allows error reporting
- * - Provides error details for developers
- * - Stores error history for debugging
- */
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Handle app state changes to potentially recover from errors when app comes to foreground
+  private appStateSubscription: any;
+  
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
       hasError: false,
       error: null,
       errorInfo: null,
-      errorHistory: [],
-      showErrorDetails: false,
+      parsedStackTrace: [],
+      isExpanded: false,
+      isClipboardAvailable: Platform.OS !== 'web',
     };
   }
-
-  // React error boundary lifecycle method
-  static getDerivedStateFromError(_: Error): Partial<ErrorBoundaryState> {
-    return { hasError: true };
+  
+  componentDidMount() {
+    // Subscribe to app state changes to potentially auto-recover
+    this.appStateSubscription = AppState.addEventListener(
+      'change',
+      this.handleAppStateChange
+    );
   }
-
-  // React error boundary lifecycle method
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Update state with error details
-    this.setState({
+  
+  componentWillUnmount() {
+    // Clean up app state subscription
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+    }
+  }
+  
+  handleAppStateChange = (nextAppState: AppStateStatus) => {
+    // When app comes back to active state, if there was an error
+    // we'll try to reset the error state to allow recovery
+    if (nextAppState === 'active' && this.state.hasError) {
+      this.setState({
+        hasError: false,
+        error: null,
+        errorInfo: null,
+        parsedStackTrace: [],
+      });
+    }
+  };
+  
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    // Update state to indicate an error has occurred
+    return {
+      hasError: true,
       error,
-      errorInfo,
-    });
-
-    // Log error to console
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-
-    // Call onError callback if provided
+      errorInfo: null,
+      parsedStackTrace: [],
+      isExpanded: false,
+      isClipboardAvailable: Platform.OS !== 'web',
+    };
+  }
+  
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Parse stack trace
+    StackTrace.fromError(error)
+      .then(stackframes => {
+        const stackTraceLines = stackframes.map(frame => frame.toString());
+        this.setState({
+          errorInfo,
+          parsedStackTrace: stackTraceLines,
+        });
+      })
+      .catch(parseError => {
+        console.error('Error parsing stack trace:', parseError);
+        // If stacktrace parsing fails, still update state with error info
+        this.setState({ errorInfo });
+      });
+    
+    // Call error handler if provided
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-
-    // Store error in AsyncStorage
-    this.storeError(error, errorInfo);
+    
+    // Log error to console
+    console.error('Error caught by ErrorBoundary:', error, errorInfo);
   }
-
-  // Store error in AsyncStorage for later analysis
-  async storeError(error: Error, errorInfo: ErrorInfo): Promise<void> {
-    try {
-      // Create new error log entry
-      const newError: ErrorLogEntry = {
-        timestamp: Date.now(),
-        message: error.message,
-        stack: error.stack,
-        componentStack: errorInfo.componentStack,
-      };
-
-      // Get existing errors
-      let storedErrors: ErrorLogEntry[] = [];
-      const storedErrorsJson = await AsyncStorage.getItem(ERROR_STORAGE_KEY);
-      
-      if (storedErrorsJson) {
-        storedErrors = JSON.parse(storedErrorsJson);
-      }
-
-      // Add new error and limit the number of stored errors
-      const updatedErrors = [newError, ...storedErrors].slice(0, MAX_STORED_ERRORS);
-      
-      // Save updated errors
-      await AsyncStorage.setItem(ERROR_STORAGE_KEY, JSON.stringify(updatedErrors));
-      
-      // Update state
-      this.setState({ errorHistory: updatedErrors });
-    } catch (storageError) {
-      console.error('Failed to store error:', storageError);
-    }
-  }
-
-  // Load error history from AsyncStorage
-  async loadErrorHistory(): Promise<void> {
-    try {
-      const storedErrorsJson = await AsyncStorage.getItem(ERROR_STORAGE_KEY);
-      
-      if (storedErrorsJson) {
-        const storedErrors: ErrorLogEntry[] = JSON.parse(storedErrorsJson);
-        this.setState({ errorHistory: storedErrors });
-      }
-    } catch (error) {
-      console.error('Failed to load error history:', error);
-    }
-  }
-
-  // Clear error history from AsyncStorage
-  async clearErrorHistory(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(ERROR_STORAGE_KEY);
-      this.setState({ errorHistory: [] });
-    } catch (error) {
-      console.error('Failed to clear error history:', error);
-    }
-  }
-
-  // Reset the error boundary
-  resetErrorBoundary = (): void => {
+  
+  // Attempt to reset the error state
+  resetError = () => {
     this.setState({
       hasError: false,
       error: null,
       errorInfo: null,
-      showErrorDetails: false,
+      parsedStackTrace: [],
     });
-
-    // Call reset callback if provided
-    if (this.props.reset) {
-      this.props.reset();
-    }
   };
-
-  // Toggle error details visibility
-  toggleErrorDetails = (): void => {
+  
+  // Toggle expanded state for stack trace
+  toggleExpanded = () => {
     this.setState(prevState => ({
-      showErrorDetails: !prevState.showErrorDetails,
+      isExpanded: !prevState.isExpanded,
     }));
   };
-
-  // Format error stack for display
-  formatErrorStack(stack?: string): string {
-    if (!stack) return 'No stack trace available';
-    
-    return stack
-      .split('\n')
-      .slice(0, 10) // Limit to first 10 lines
-      .join('\n');
-  }
-
-  // Render error UI
-  renderError(): ReactNode {
-    const { error, errorInfo, showErrorDetails } = this.state;
-    const theme = lightTheme; // Always use light theme for error UI
-
-    if (this.props.fallback) {
-      return this.props.fallback;
+  
+  // Copy error details to clipboard
+  copyToClipboard = async () => {
+    try {
+      const { error, parsedStackTrace } = this.state;
+      const errorText = error ? `${error.name}: ${error.message}\n\nStack Trace:\n${parsedStackTrace.join('\n')}` : 'No error details available';
+      await Clipboard.setStringAsync(errorText);
+      console.log('Error details copied to clipboard');
+    } catch (e) {
+      console.error('Failed to copy to clipboard:', e);
     }
-
+  };
+  
+  render() {
+    const { hasError, error, parsedStackTrace, isExpanded, isClipboardAvailable } = this.state;
+    const { children, fallback, maxStackTraceLines = 10, theme } = this.props;
+    
+    if (!hasError) {
+      return children;
+    }
+    
+    // Use custom fallback if provided
+    if (fallback) {
+      return fallback;
+    }
+    
+    // Default error UI
+    const errorMessage = error ? error.message : 'An unexpected error occurred';
+    const errorName = error ? error.name : 'Error';
+    
+    // Limit the number of stack trace lines shown initially
+    const displayedStackTrace = isExpanded
+      ? parsedStackTrace
+      : parsedStackTrace.slice(0, maxStackTraceLines);
+    
+    // Get colors from theme
+    const backgroundColor = getColor(theme, 'background');
+    const textColor = getColor(theme, 'text');
+    const errorColor = getColor(theme, 'error');
+    const borderColor = getColor(theme, 'border');
+    const cardColor = getColor(theme, 'card');
+    
     return (
-      <View style={styles.container}>
-        <View style={[styles.errorCard, getShadow(theme, 'md')]}>
-          <MaterialIcons 
-            name="error-outline" 
-            size={48} 
-            color={getColor(theme, 'error')}
-            style={styles.icon}
-          />
-          
-          <Text style={styles.title}>Something went wrong</Text>
-          
-          <Text style={styles.message}>
-            {error?.message || 'An unexpected error occurred in the application.'}
-          </Text>
-          
-          <View style={styles.actions}>
-            <Button 
-              mode="contained" 
-              onPress={this.resetErrorBoundary}
-              style={[styles.button, { backgroundColor: getColor(theme, 'primary') }]}
-              labelStyle={styles.buttonText}
-            >
-              Try Again
-            </Button>
-            
-            <Button 
-              mode="outlined" 
-              onPress={this.toggleErrorDetails}
-              style={styles.button}
-              labelStyle={{ color: getColor(theme, 'primary') }}
-            >
-              {showErrorDetails ? 'Hide Details' : 'Show Details'}
-            </Button>
+      <View style={[styles.container, { backgroundColor }]}>
+        <View style={[styles.errorCard, { backgroundColor: cardColor, borderColor }]}>
+          <View style={styles.header}>
+            <MaterialIcons name="error" size={24} color={errorColor} />
+            <Text style={[styles.errorTitle, { color: errorColor }]}>
+              {errorName}
+            </Text>
           </View>
           
-          {showErrorDetails && (
-            <ScrollView 
-              style={styles.detailsContainer}
-              contentContainerStyle={styles.detailsContent}
-            >
-              <Text style={styles.detailsTitle}>Error Details:</Text>
-              
-              {error && (
-                <View style={styles.detailsSection}>
-                  <Text style={styles.detailsLabel}>Error:</Text>
-                  <Text style={styles.detailsText}>{error.name}: {error.message}</Text>
+          <Text style={[styles.errorMessage, { color: textColor }]}>
+            {errorMessage}
+          </Text>
+          
+          {parsedStackTrace.length > 0 && (
+            <View style={styles.stackTraceContainer}>
+              <View style={styles.stackTraceHeader}>
+                <Text style={[styles.stackTraceTitle, { color: textColor }]}>
+                  Stack Trace
+                </Text>
+                
+                <View style={styles.stackTraceActions}>
+                  {isClipboardAvailable && (
+                    <TouchableOpacity 
+                      onPress={this.copyToClipboard}
+                      style={styles.actionButton}
+                    >
+                      <MaterialIcons name="content-copy" size={18} color={textColor} />
+                    </TouchableOpacity>
+                  )}
+                  
+                  <TouchableOpacity 
+                    onPress={this.toggleExpanded}
+                    style={styles.actionButton}
+                  >
+                    <MaterialIcons 
+                      name={isExpanded ? 'expand-less' : 'expand-more'} 
+                      size={18} 
+                      color={textColor} 
+                    />
+                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
               
-              {error?.stack && (
-                <View style={styles.detailsSection}>
-                  <Text style={styles.detailsLabel}>Stack:</Text>
-                  <Text style={styles.detailsCode}>
-                    {this.formatErrorStack(error.stack)}
+              <ScrollView style={styles.stackTrace}>
+                {displayedStackTrace.map((line, index) => (
+                  <Text 
+                    key={index}
+                    style={[styles.stackTraceLine, { color: textColor }]}
+                    numberOfLines={1}
+                  >
+                    {line}
                   </Text>
-                </View>
-              )}
-              
-              {errorInfo?.componentStack && (
-                <View style={styles.detailsSection}>
-                  <Text style={styles.detailsLabel}>Component Stack:</Text>
-                  <Text style={styles.detailsCode}>
-                    {this.formatErrorStack(errorInfo.componentStack)}
-                  </Text>
-                </View>
-              )}
-              
-              {__DEV__ && (
-                <TouchableOpacity
-                  style={styles.clearButton}
-                  onPress={() => this.clearErrorHistory()}
-                >
-                  <Text style={styles.clearButtonText}>Clear Error History</Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
+                ))}
+                
+                {!isExpanded && parsedStackTrace.length > maxStackTraceLines && (
+                  <TouchableOpacity onPress={this.toggleExpanded}>
+                    <Text style={[styles.showMoreText, { color: getColor(theme, 'primary') }]}>
+                      Show more... ({parsedStackTrace.length - maxStackTraceLines} more lines)
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            </View>
           )}
+          
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: getColor(theme, 'primary') }]}
+            onPress={this.resetError}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
-  }
-
-  render(): ReactNode {
-    const { hasError } = this.state;
-    
-    if (hasError) {
-      return this.renderError();
-    }
-    
-    return this.props.children;
   }
 }
 
@@ -279,99 +247,75 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8F9FA',
+    padding: 20,
   },
   errorCard: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-  },
-  icon: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: 16,
-    color: '#4B5563',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16,
-    flexWrap: 'wrap',
-  },
-  button: {
-    marginHorizontal: 8,
-    marginVertical: 8,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-  detailsContainer: {
-    maxHeight: 300,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  detailsContent: {
     padding: 16,
+    borderWidth: 1,
   },
-  detailsTitle: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  errorMessage: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  detailsSection: {
     marginBottom: 16,
   },
-  detailsLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4B5563',
-    marginBottom: 4,
+  stackTraceContainer: {
+    marginBottom: 16,
   },
-  detailsText: {
-    fontSize: 14,
-    color: '#4B5563',
-  },
-  detailsCode: {
-    fontSize: 12,
-    color: '#4B5563',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    backgroundColor: '#F3F4F6',
-    padding: 8,
-    borderRadius: 4,
-  },
-  clearButton: {
-    padding: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
+  stackTraceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginBottom: 8,
   },
-  clearButtonText: {
-    color: '#4B5563',
+  stackTraceTitle: {
     fontSize: 14,
+    fontWeight: 'bold',
+  },
+  stackTraceActions: {
+    flexDirection: 'row',
+  },
+  actionButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  stackTrace: {
+    maxHeight: 200,
+  },
+  stackTraceLine: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : Platform.OS === 'android' ? 'monospace' : 'Courier',
+  },
+  showMoreText: {
+    fontSize: 12,
+    marginTop: 4,
     fontWeight: '500',
+  },
+  retryButton: {
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
+
+// Wrap component with ThemeContext
+export const ErrorBoundary = withTheme(ErrorBoundaryComponent);
 
 export default ErrorBoundary;

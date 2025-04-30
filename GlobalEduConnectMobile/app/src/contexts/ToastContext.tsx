@@ -1,198 +1,246 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { StyleSheet, Animated, View, Text, TouchableOpacity, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import React, { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
+import { Animated, StyleSheet, View, Text, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ANIMATION } from '../config/constants';
 import { useTheme } from './ThemeContext';
+import { getColor, getShadow } from '../theme';
 
 // Toast types
-type ToastType = 'success' | 'error' | 'info' | 'warning';
+export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
-// Toast position
-type ToastPosition = 'top' | 'bottom';
-
-// Toast data
-interface ToastData {
-  id: number;
+// Toast configuration
+export interface ToastConfig {
   type: ToastType;
   message: string;
   duration?: number;
-  position?: ToastPosition;
+  action?: {
+    label: string;
+    onPress: () => void;
+  };
 }
 
-// Context value
-interface ToastContextValue {
-  showToast: (options: Omit<ToastData, 'id'>) => void;
-  hideToast: (id?: number) => void;
+// Toast context type
+interface ToastContextType {
+  showToast: (config: ToastConfig) => void;
+  hideToast: () => void;
 }
 
 // Create context
-const ToastContext = createContext<ToastContextValue | null>(null);
+const ToastContext = createContext<ToastContextType | null>(null);
 
 // Toast provider props
 interface ToastProviderProps {
-  children: React.ReactNode;
-  defaultPosition?: ToastPosition;
-  defaultDuration?: number;
+  children: ReactNode;
 }
 
-export function ToastProvider({
-  children,
-  defaultPosition = 'top',
-  defaultDuration = 3000,
-}: ToastProviderProps) {
-  // Theme
-  const { colors, isDark } = useTheme();
+export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
+  // Animation state values
+  const translateY = useRef(new Animated.Value(-100)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
   
-  // State for active toasts
-  const [toasts, setToasts] = useState<ToastData[]>([]);
+  // Toast state
+  const [visible, setVisible] = useState(false);
+  const [toast, setToast] = useState<ToastConfig>({
+    type: 'info',
+    message: '',
+  });
   
-  // Animation value
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  // Timeout reference
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // ID counter for unique toast IDs
-  const toastIdCounter = useRef(0);
+  // Get theme
+  const { theme } = useTheme();
   
-  // Show toast
-  const showToast = useCallback(({
-    type,
-    message,
-    duration = defaultDuration,
-    position = defaultPosition,
-  }: Omit<ToastData, 'id'>) => {
-    // Create toast with unique ID
-    const id = toastIdCounter.current++;
-    const newToast: ToastData = {
-      id,
-      type,
-      message,
-      duration,
-      position,
-    };
-    
-    // Add toast to state
-    setToasts(currentToasts => [...currentToasts, newToast]);
-    
-    // Auto-hide toast after duration
-    if (duration > 0) {
-      setTimeout(() => {
-        hideToast(id);
-      }, duration);
+  // Show the toast
+  const showToast = (config: ToastConfig) => {
+    // Clear any existing timeout
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
     }
     
-    // Animate toast in
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: ANIMATION.SHORT,
-      useNativeDriver: true,
-    }).start();
-    
-    return id;
-  }, [fadeAnim, defaultDuration, defaultPosition]);
-  
-  // Hide toast
-  const hideToast = useCallback((id?: number) => {
-    // Animate out
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: ANIMATION.SHORT,
-      useNativeDriver: true,
-    }).start(() => {
-      // Remove toast from state
-      setToasts(currentToasts => 
-        id !== undefined
-          ? currentToasts.filter(toast => toast.id !== id)
-          : currentToasts.slice(1) // Remove oldest toast if no ID specified
-      );
+    // Update toast config
+    setToast({
+      ...config,
+      duration: config.duration || 3000, // Default duration: 3 seconds
     });
-  }, [fadeAnim]);
+    
+    // Show the toast
+    setVisible(true);
+    
+    // Animate in
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Auto-hide after duration (if not an error toast)
+    if (config.type !== 'error') {
+      hideTimeoutRef.current = setTimeout(() => {
+        hideToast();
+      }, config.duration || 3000);
+    }
+  };
   
-  // Get icon for toast type
-  const getIconForType = (type: ToastType): string => {
+  // Hide the toast
+  const hideToast = () => {
+    // Only proceed if toast is visible
+    if (!visible) return;
+    
+    // Animate out
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -100,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setVisible(false);
+    });
+    
+    // Clear timeout if it exists
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // Get toast icon based on type
+  const getToastIcon = (type: ToastType) => {
     switch (type) {
+      case 'info':
+        return 'info-outline';
       case 'success':
-        return 'check-circle';
-      case 'error':
-        return 'error';
+        return 'check-circle-outline';
       case 'warning':
         return 'warning';
-      case 'info':
+      case 'error':
+        return 'error-outline';
       default:
-        return 'info';
+        return 'info-outline';
     }
   };
   
-  // Get background color for toast type
-  const getBackgroundColorForType = (type: ToastType): string => {
+  // Get toast background color based on type
+  const getToastBackgroundColor = (type: ToastType): string => {
     switch (type) {
-      case 'success':
-        return colors.success;
-      case 'error':
-        return colors.error;
-      case 'warning':
-        return colors.warning;
       case 'info':
+        return getColor(theme, 'info');
+      case 'success':
+        return getColor(theme, 'success');
+      case 'warning':
+        return getColor(theme, 'warning');
+      case 'error':
+        return getColor(theme, 'error');
       default:
-        return colors.info;
+        return getColor(theme, 'info');
     }
   };
+  
+  // Build toast styles
+  const toastStyles: ViewStyle = {
+    ...styles.toast,
+    ...getShadow(theme, 'md'),
+    backgroundColor: getColor(theme, 'background'),
+    borderLeftColor: getToastBackgroundColor(toast.type),
+  };
+  
+  const iconColor = getToastBackgroundColor(toast.type);
+  const textColor = getColor(theme, 'text');
   
   return (
     <ToastContext.Provider value={{ showToast, hideToast }}>
       {children}
       
-      {/* Toast container */}
-      {toasts.map(toast => (
-        <Animated.View
-          key={toast.id}
+      {/* Toast component */}
+      {visible && (
+        <Animated.View 
           style={[
-            styles.container,
-            toast.position === 'top' ? styles.top : styles.bottom,
+            toastStyles,
             {
-              backgroundColor: getBackgroundColorForType(toast.type),
-              opacity: fadeAnim,
-              transform: [
-                {
-                  translateY: fadeAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [toast.position === 'top' ? -100 : 100, 0],
-                  }),
-                },
-              ],
+              transform: [{ translateY }],
+              opacity,
             },
-            isDark ? styles.darkShadow : styles.lightShadow,
           ]}
         >
-          <TouchableOpacity
-            style={styles.content}
-            activeOpacity={0.8}
-            onPress={() => hideToast(toast.id)}
-          >
-            <MaterialIcons
-              name={getIconForType(toast.type)}
-              size={24}
-              color={colors.white}
+          <View style={styles.toastContent}>
+            <MaterialIcons 
+              name={getToastIcon(toast.type)} 
+              size={24} 
+              color={iconColor} 
               style={styles.icon}
             />
-            <Text style={styles.message}>{toast.message}</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => hideToast(toast.id)}
+            
+            <Text 
+              style={[
+                styles.message,
+                { color: textColor },
+              ]}
+              numberOfLines={2}
             >
-              <MaterialIcons
-                name="close"
-                size={20}
-                color={colors.white}
+              {toast.message}
+            </Text>
+            
+            {toast.action && (
+              <TouchableOpacity 
+                onPress={() => {
+                  toast.action?.onPress();
+                  hideToast();
+                }}
+                style={styles.actionButton}
+              >
+                <Text 
+                  style={[
+                    styles.actionText,
+                    { color: iconColor },
+                  ]}
+                >
+                  {toast.action.label}
+                </Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              onPress={hideToast}
+              style={styles.closeButton}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            >
+              <MaterialIcons 
+                name="close" 
+                size={20} 
+                color={getColor(theme, 'textSecondary')} 
               />
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         </Animated.View>
-      ))}
+      )}
     </ToastContext.Provider>
   );
-}
+};
 
-// Hook to use toast
-export function useToast() {
+// Custom hook for using toast
+export const useToast = () => {
   const context = useContext(ToastContext);
   
   if (!context) {
@@ -200,31 +248,25 @@ export function useToast() {
   }
   
   return context;
-}
+};
 
 // Styles
 const styles = StyleSheet.create({
-  container: {
+  toast: {
     position: 'absolute',
+    top: 40, // Provide space for the status bar
     left: 16,
     right: 16,
-    padding: 0,
-    borderRadius: 8,
     zIndex: 9999,
-    maxWidth: 500,
-    alignSelf: 'center',
-    width: '100%',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    overflow: 'hidden',
+    minHeight: 54,
   },
-  top: {
-    top: 50,
-  },
-  bottom: {
-    bottom: 50,
-  },
-  content: {
+  toastContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
   },
   icon: {
     marginRight: 12,
@@ -232,25 +274,21 @@ const styles = StyleSheet.create({
   message: {
     flex: 1,
     fontSize: 14,
-    color: '#FFF',
     fontWeight: '500',
+  },
+  actionButton: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   closeButton: {
     marginLeft: 8,
     padding: 4,
   },
-  lightShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  darkShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 5,
-  },
 });
+
+export default ToastContext;

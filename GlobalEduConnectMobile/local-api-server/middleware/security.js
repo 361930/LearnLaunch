@@ -1,216 +1,227 @@
 /**
- * Security middleware for GlobalEduConnect Local API Server
+ * Security middleware for GlobalEduConnect API Server
  * 
- * Implements various security measures to protect the API:
- * - Input validation
- * - Blocked IP addresses
- * - Request validation
- * - Basic DOS protection
+ * Provides various security enhancements:
+ * - Input validation and sanitization
+ * - Rate limiting
+ * - CORS configuration
+ * - Content Security Policy
+ * - Request logging
  */
 
-// Track request counts and timestamps for basic DOS protection
-const requestTracker = {
-  // Map IP addresses to request counts
-  counts: new Map(),
-  // Map IP addresses to timestamps of first request in window
-  timestamps: new Map(),
-  // Window size in milliseconds
-  windowMs: 60 * 1000, // 1 minute
-  // Threshold for suspicious behavior
-  threshold: 100, // 100 requests per minute
-  // Reset counts for an IP address
-  reset(ip) {
-    this.counts.delete(ip);
-    this.timestamps.delete(ip);
-  },
-  // Record a request from an IP address
-  record(ip) {
-    const now = Date.now();
-    
-    // If IP not in maps or window expired, reset counts
-    if (!this.counts.has(ip) || now - this.timestamps.get(ip) > this.windowMs) {
-      this.counts.set(ip, 1);
-      this.timestamps.set(ip, now);
-      return 1;
-    }
-    
-    // Increment count for existing IP
-    const count = this.counts.get(ip) + 1;
-    this.counts.set(ip, count);
-    return count;
-  },
-  // Check if IP has exceeded threshold
-  isAbusive(ip) {
-    return this.counts.has(ip) && this.counts.get(ip) > this.threshold;
-  }
-};
-
-// List of blocked IP addresses
-const blockedIPs = new Set();
+const rateLimit = require('express-rate-limit');
+const validator = require('validator');
 
 /**
- * Set security-related HTTP headers
+ * Set up security-related response headers
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
  */
-function setSecurityHeaders(req, res, next) {
+function securityHeaders(req, res, next) {
   // Set security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ws: wss:;");
+  res.setHeader('Referrer-Policy', 'same-origin');
   
   next();
 }
 
 /**
- * Simple input sanitization middleware
+ * Configure CORS for API requests
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+function corsMiddleware(req, res, next) {
+  // For local development, we allow all origins
+  // In a production environment, this would be more restrictive
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+}
+
+/**
+ * Sanitize request inputs
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
  */
 function sanitizeInputs(req, res, next) {
-  // Function to sanitize a string
-  const sanitizeString = (str) => {
-    if (typeof str !== 'string') return str;
-    
-    // Remove potentially dangerous patterns
-    return str
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/javascript:/gi, '')
-      .replace(/\bon\w+\s*=/gi, '')
-      .trim();
-  };
-  
-  // Sanitize request body
+  // Sanitize body parameters
   if (req.body) {
-    Object.keys(req.body).forEach(key => {
-      if (typeof req.body[key] === 'string') {
-        req.body[key] = sanitizeString(req.body[key]);
-      }
-    });
+    sanitizeObject(req.body);
   }
   
   // Sanitize query parameters
   if (req.query) {
-    Object.keys(req.query).forEach(key => {
-      if (typeof req.query[key] === 'string') {
-        req.query[key] = sanitizeString(req.query[key]);
+    sanitizeObject(req.query);
+  }
+  
+  // Sanitize URL parameters
+  if (req.params) {
+    sanitizeObject(req.params);
+  }
+  
+  next();
+}
+
+/**
+ * Recursively sanitize an object
+ * 
+ * @param {Object} obj - Object to sanitize
+ */
+function sanitizeObject(obj) {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      
+      if (typeof value === 'string') {
+        // Sanitize string to prevent XSS
+        obj[key] = validator.escape(value);
+      } else if (typeof value === 'object' && value !== null) {
+        // Recursively sanitize nested objects
+        sanitizeObject(value);
       }
-    });
-  }
-  
-  next();
-}
-
-/**
- * Check for blocked IP addresses
- */
-function checkBlockedIP(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
-  
-  if (blockedIPs.has(ip)) {
-    return res.status(403).json({ 
-      error: 'Access blocked. Please contact support if you believe this is in error.' 
-    });
-  }
-  
-  next();
-}
-
-/**
- * Basic DOS protection middleware
- */
-function protectAgainstDOS(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
-  
-  // Skip for allowed testing IPs
-  if (ip === '127.0.0.1' || ip === '::1') {
-    return next();
-  }
-  
-  // Record request and check count
-  const count = requestTracker.record(ip);
-  
-  // If abusive, block temporarily
-  if (requestTracker.isAbusive(ip)) {
-    console.warn(`Potential DOS attack detected from IP: ${ip}`);
-    return res.status(429).json({ 
-      error: 'Too many requests. Please try again later.'
-    });
-  }
-  
-  next();
-}
-
-/**
- * Validate request format
- */
-function validateRequest(req, res, next) {
-  // Check content type for POST/PUT/PATCH requests
-  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-    const contentType = req.headers['content-type'] || '';
-    
-    if (!contentType.includes('application/json')) {
-      return res.status(415).json({ 
-        error: 'Unsupported Media Type. Content-Type must be application/json'
-      });
-    }
-    
-    // Check for empty body
-    if (Object.keys(req.body).length === 0) {
-      return res.status(400).json({ 
-        error: 'Request body is empty or invalid'
-      });
     }
   }
-  
-  next();
 }
 
 /**
- * Security logging middleware
+ * Create rate limiter middleware
+ * 
+ * @param {Object} options - Rate limiting options
+ * @returns {Function} Express middleware
  */
-function securityLogging(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
+function createRateLimiter(options = {}) {
+  const defaultOptions = {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Max 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests, please try again later.',
+  };
+  
+  return rateLimit({
+    ...defaultOptions,
+    ...options,
+  });
+}
+
+/**
+ * Stricter rate limiter for auth endpoints
+ */
+const authRateLimiter = createRateLimiter({
+  windowMs: 30 * 60 * 1000, // 30 minutes
+  max: 10, // Max 10 requests per windowMs
+  message: 'Too many login attempts, please try again later.',
+});
+
+/**
+ * Basic request logger middleware
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+function requestLogger(req, res, next) {
+  const timestamp = new Date().toISOString();
   const method = req.method;
-  const url = req.originalUrl || req.url;
-  const userAgent = req.headers['user-agent'] || 'unknown';
+  const url = req.originalUrl;
+  const ip = req.ip || req.connection.remoteAddress;
+  const userAgent = req.headers['user-agent'] || 'Unknown';
   
-  // Log suspicious requests
-  if (
-    url.includes('../') || 
-    url.includes('..\\') || 
-    url.includes('SELECT') || 
-    url.includes('UNION') ||
-    url.includes('%27') || // Single quote
-    url.includes('%22') || // Double quote
-    url.includes('%60')    // Backtick
-  ) {
-    console.warn(`Suspicious request detected - IP: ${ip}, Method: ${method}, URL: ${url}, User-Agent: ${userAgent}`);
+  console.log(`[${timestamp}] ${method} ${url} - IP: ${ip} - UA: ${userAgent}`);
+  
+  // Track response time
+  const startTime = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    const statusCode = res.statusCode;
+    console.log(`[${timestamp}] ${method} ${url} - ${statusCode} - ${duration}ms`);
+  });
+  
+  next();
+}
+
+/**
+ * Validate JSON content in requests
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+function validateJsonContent(req, res, next) {
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+    const contentType = req.headers['content-type'];
+    
+    if (contentType && contentType.includes('application/json')) {
+      // Check if body is empty when it should have content
+      if (Object.keys(req.body).length === 0) {
+        return res.status(400).json({ error: 'Empty JSON body not allowed' });
+      }
+    }
   }
   
   next();
 }
 
 /**
- * Setup all security middleware
+ * Error handling middleware
+ * 
+ * @param {Error} err - Error object
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
  */
-function setupSecurity(app) {
-  app.use(checkBlockedIP);
-  app.use(setSecurityHeaders);
-  app.use(sanitizeInputs);
-  app.use(protectAgainstDOS);
-  app.use(validateRequest);
-  app.use(securityLogging);
+function errorHandler(err, req, res, next) {
+  // Log error details
+  console.error('Error occurred:', err);
   
-  console.log('Security middleware initialized');
+  // Send appropriate response
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'An unexpected error occurred';
+  
+  // In production, don't expose detailed error messages
+  const response = process.env.NODE_ENV === 'production'
+    ? { error: statusCode === 500 ? 'An unexpected error occurred' : message }
+    : { error: message, stack: process.env.NODE_ENV === 'development' ? err.stack : undefined };
+  
+  res.status(statusCode).json(response);
+}
+
+/**
+ * Not found handler middleware
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+function notFoundHandler(req, res) {
+  res.status(404).json({ error: 'Resource not found' });
 }
 
 module.exports = {
-  setupSecurity,
-  blockedIPs,
-  requestTracker,
-  // Export individual middlewares for selective use
-  setSecurityHeaders,
+  securityHeaders,
+  corsMiddleware,
   sanitizeInputs,
-  checkBlockedIP,
-  protectAgainstDOS,
-  validateRequest,
-  securityLogging
+  createRateLimiter,
+  authRateLimiter,
+  requestLogger,
+  validateJsonContent,
+  errorHandler,
+  notFoundHandler,
 };
