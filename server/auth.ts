@@ -2,10 +2,11 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import { compare } from "bcrypt";
+import { compare, hash } from "bcrypt";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
 import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 
 declare global {
   namespace Express {
@@ -14,6 +15,24 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
+  // Security: Rate limiting for auth endpoints to prevent brute force attacks
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many login attempts, please try again later" }
+  });
+
+  // General API rate limiter
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100, // 100 requests per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests, please try again later" }
+  });
+
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     resave: false,
@@ -22,8 +41,15 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       secure: process.env.NODE_ENV === "production",
+      httpOnly: true, // Mitigates XSS attacks
+      sameSite: 'strict' // CSRF protection
     }
   };
+
+  // Apply rate limiters
+  app.use('/api/auth/login', authLimiter);
+  app.use('/api/auth/register', authLimiter);
+  app.use('/api', apiLimiter);
 
   app.set("trust proxy", 1);
   app.use(session(sessionSettings));
@@ -103,9 +129,13 @@ export function setupAuth(app: Express) {
         return res.status(403).json({ message: "Admin accounts can only be created by system administrators" });
       }
       
-      // Create user
+      // Hash password with stronger security (12 rounds)
+      const hashedPassword = await hash(userData.password, 12);
+      
+      // Create user with hashed password
       const user = await storage.createUser({
         ...userData,
+        password: hashedPassword,
         role: role || "student",
         status,
       });
@@ -162,7 +192,15 @@ export function setupAuth(app: Express) {
         if (err) {
           return next(err);
         }
-        return res.json(user);
+        // Don't send password hash to client
+        const { password, ...userWithoutPassword } = user;
+        
+        // Add security headers
+        res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; object-src 'none';");
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Frame-Options', 'DENY');
+        
+        return res.json(userWithoutPassword);
       });
     })(req, res, next);
   });
@@ -172,7 +210,23 @@ export function setupAuth(app: Express) {
       if (err) {
         return res.status(500).json({ message: "Logout failed" });
       }
-      res.status(200).json({ message: "Logged out successfully" });
+      
+      // Destroy the session completely
+      req.session.destroy((sessionErr) => {
+        if (sessionErr) {
+          console.error("Error destroying session:", sessionErr);
+        }
+        
+        // Clear any cookies
+        res.clearCookie('connect.sid');
+        
+        // Set security headers
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
+        res.status(200).json({ message: "Logged out successfully" });
+      });
     });
   });
 

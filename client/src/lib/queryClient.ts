@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { createNetworkAwareQueryClient, setupNetworkStatusListeners } from "./network-aware-query-client";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -12,15 +13,29 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  // Check for offline status before even attempting the request
+  if (!navigator.onLine) {
+    throw new Error("Cannot make API requests while offline");
+  }
 
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    // Add context about offline status to the error
+    if (!navigator.onLine) {
+      console.warn("Network request failed while offline:", url);
+      throw new Error("You are currently offline. Please check your internet connection and try again.");
+    }
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -29,29 +44,40 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-    });
+    try {
+      const res = await fetch(queryKey[0] as string, {
+        credentials: "include",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      // Add better offline experience
+      if (!navigator.onLine) {
+        console.warn("Query failed because device is offline. Using cached data if available.");
+        // Let the query client use stale data
+      }
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
-    },
-    mutations: {
-      retry: false,
-    },
-  },
+// Create a network-aware query client
+const networkAwareClient = createNetworkAwareQueryClient();
+
+// Set up the default query function
+networkAwareClient.setDefaultOptions({
+  queries: {
+    ...networkAwareClient.getDefaultOptions().queries,
+    queryFn: getQueryFn({ on401: "throw" }),
+  }
 });
+
+// Set up listeners for online/offline events
+setupNetworkStatusListeners(networkAwareClient);
+
+// Export the configured query client
+export const queryClient = networkAwareClient;

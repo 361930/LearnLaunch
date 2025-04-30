@@ -1,10 +1,24 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { setupSecurity } from "./security";
+import helmet from "helmet";
+import compression from "compression";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Apply security measures before handling any requests
+setupSecurity(app);
+
+// Apply Helmet for additional security headers
+app.use(helmet());
+
+// Use compression to improve performance
+app.use(compression());
+
+// Limit request body size to prevent abuse
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();

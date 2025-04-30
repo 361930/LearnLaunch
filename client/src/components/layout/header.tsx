@@ -17,7 +17,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu, LogOut, Settings, User as UserIcon, BookOpen, Home, LayoutDashboard, GitBranch, Award } from "lucide-react";
+import { Menu, LogOut, Settings, User as UserIcon, BookOpen, Home, LayoutDashboard, GitBranch, Award, Layers } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Header() {
@@ -48,6 +48,12 @@ export default function Header() {
         <Link href="/challenges">
           {isMobile && <Award className="h-5 w-5 mr-2" />}
           Challenges
+        </Link>
+      </li>
+      <li className={location.startsWith("/skeleton-demo") ? "text-primary font-bold" : ""}>
+        <Link href="/skeleton-demo">
+          {isMobile && <Layers className="h-5 w-5 mr-2" />}
+          Skeletons
         </Link>
       </li>
       {user && (

@@ -2,8 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, minimum-scale=1" />
     <title>GlobalEduConnect - Connect with Educators Worldwide</title>
+    
+    <!-- PWA Support -->
+    <meta name="description" content="GlobalEduConnect - A comprehensive mobile-enabled educational platform that supports global learning connections through adaptive technology" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GlobalEduConnect" />
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Icon links for various platforms -->
+    <link rel="icon" type="image/png" sizes="196x196" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    
+    <!-- iOS splash screens -->
+    <link rel="apple-touch-startup-image" href="/icons/icon-512x512.png" />
+    
+    <!-- Fonts -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
     <style>
       @font-face {
@@ -20,12 +39,83 @@
         font-style: normal;
         font-display: swap;
       }
+      
+      /* Add offline indicator styles */
+      .connection-status {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        transition: opacity 0.3s ease;
+      }
+      
+      .connection-status.visible {
+        display: flex;
+      }
+      
+      .connection-status .indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: #f44336;
+      }
+      
+      .connection-status.online .indicator {
+        background-color: #4caf50;
+      }
     </style>
   </head>
   <body>
     <div id="root"></div>
+    
+    <!-- Connection status indicator -->
+    <div class="connection-status" id="connection-status">
+      <div class="indicator"></div>
+      <span class="status-text">Offline</span>
+    </div>
+    
     <script type="module" src="/src/main.tsx"></script>
+    
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+    
+    <!-- Inline script to handle connection status -->
+    <script>
+      function updateOnlineStatus() {
+        const statusEl = document.getElementById('connection-status');
+        const statusText = statusEl.querySelector('.status-text');
+        
+        if (navigator.onLine) {
+          statusEl.classList.add('online');
+          statusText.textContent = 'Online';
+          statusEl.classList.add('visible');
+          // Hide after 3 seconds
+          setTimeout(() => {
+            statusEl.classList.remove('visible');
+          }, 3000);
+        } else {
+          statusEl.classList.remove('online');
+          statusText.textContent = 'Offline';
+          statusEl.classList.add('visible');
+        }
+      }
+      
+      window.addEventListener('online', updateOnlineStatus);
+      window.addEventListener('offline', updateOnlineStatus);
+      
+      // Check initial status
+      if (!navigator.onLine) {
+        updateOnlineStatus();
+      }
+    </script>
   </body>
 </html>

@@ -15,6 +15,7 @@ import ProfilePage from "@/pages/profile";
 import NotFoundPage from "@/pages/not-found";
 import ChallengesPage from "@/pages/challenges";
 import ChallengeDetailPage from "@/pages/challenge-detail";
+import SkeletonDemoPage from "@/pages/skeleton-demo";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/challenges/:id" component={ChallengeDetailPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/profile/:id" component={ProfilePage} />
+      <Route path="/skeleton-demo" component={SkeletonDemoPage} />
       
       {/* Protected Routes */}
       <ProtectedRoute 

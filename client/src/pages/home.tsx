@@ -6,6 +6,8 @@ import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Globe, Users, Clock, BookOpen, GitBranch } from "lucide-react";
+import { CardSkeleton, ClassCardSkeleton } from "@/components/ui/skeleton";
+import { useDelayedLoader } from "@/hooks/use-delayed-loader";
 
 export default function HomePage() {
   const [featuredClasses, setFeaturedClasses] = useState<Class[]>([]);
@@ -14,6 +16,9 @@ export default function HomePage() {
   const { data: classes, isLoading } = useQuery<Class[]>({
     queryKey: ["/api/classes/featured"],
   });
+  
+  // Use delayed loader to prevent flickering for fast responses
+  const showSkeletons = useDelayedLoader(isLoading, 300, 500);
 
   useEffect(() => {
     if (classes) {
@@ -134,9 +139,11 @@ export default function HomePage() {
               </div>
             </div>
             
-            {isLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            {showSkeletons ? (
+              <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 mt-12">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <ClassCardSkeleton key={index} variant="shimmer" />
+                ))}
               </div>
             ) : featuredClasses.length > 0 ? (
               <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 mt-12">
