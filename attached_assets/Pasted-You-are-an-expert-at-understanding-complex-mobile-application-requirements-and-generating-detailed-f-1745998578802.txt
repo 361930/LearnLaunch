@@ -1,0 +1,146 @@
+You are an expert at understanding complex mobile application requirements and generating detailed feature breakdowns for cross-platform development, with a focus on creating inclusive and globally accessible educational platforms.
+
+**Context:**
+
+The application is named "Learning Centre" a cutting-edge, global public education platform designed to connect students and teachers worldwide through a dedicated mobile application. This application must run seamlessly on both Android and iOS devices. It features role-based access, advanced class scheduling, robust reporting, and a flexible donation system. The application should be built with a mobile-first approach, a responsive design that adapts to various screen sizes, and a modern, intuitive, and interactive user interface that is consistent across both platforms. A primary focus is to ensure ease of use, speed, and accessibility for users from all around the world, regardless of their technical proficiency or native language. It will be important to keep in mind security and privacy.
+
+**Application Overview:**
+
+GlobalEduConnect is a mobile-first platform that empowers students to join live public classes, access pre-recorded educational content, and participate in interactive discussions, while teachers can host live classes, share resources, and build a global teaching presence. The platform facilitates a global educational community with features for advanced user management, intuitive live and asynchronous class scheduling, content reporting, and a versatile donation system. The application must be designed for optimal performance, enhanced usability, and a seamless user experience on both Android and iOS.
+
+**User Roles:**
+
+1.  **Students:**
+    *   Can sign up/log in quickly and easily using email, phone number, or Google accounts.
+    *   Must provide minimal profile information, including their name, enrolled subjects, and interests.
+    *   Can customize their profile's privacy settings (public, private, semi-public) with an easy-to-understand interface.
+    *   Can view a personalized, easy-to-navigate schedule/calendar of live public classes and access pre-recorded content.
+    *   Can join live public classes directly through the app with a one-click join feature.
+    *   Can interact with teachers and other students through real-time chat, and forum.
+    *   Can donate to teachers ("Buy Me a Coffee" functionality) or directly to the admin through a seamless payment process.
+    *   Can easily report violations (abuse, bad behavior, etc.) within the app, with an intuitive reporting interface.
+    *   Access pre-recorded content.
+    *   Create a list of favorite teachers.
+    *   Can leave a review on classes.
+    * Can choose preferred language.
+
+2.  **Teachers:**
+    *   Must register using a streamlined, detailed form that includes their field of expertise, level of knowledge, and an optional teaching demo (video or file).
+    *   Can customize their profile visibility settings (public or visible only to admin) with clear and concise controls.
+    *   Can easily create, schedule, and host live classes that are open to students worldwide.
+    *   Must adhere to community guidelines and maintain good ratings.
+    *   Can make their profile anonymous/private if community guidelines are met.
+    *   Have a "Buy Me a Coffee" donation button on their profile, with easy access to donation tracking.
+    *   Can create pre-recorded content for their student.
+    * Have their own forum to share informations.
+    * Can set their preferred language.
+
+3.  **Admin:**
+    *   Can view, approve, or reject teacher applications efficiently.
+    *   Has access to comprehensive class logs (session times, teachers, attendees, content of classes) within the app's admin panel.
+    *   Can monitor reports and overall user activity with detailed analytics.
+    *   Can receive and manage donations from users.
+    *   Moderates flagged accounts and ensures community safety with clear and efficient moderation tools.
+    *   Can block users from specific countries.
+    * Can make important announcement.
+
+**Core Features and Functionality (Mobile-Specific Considerations & Enhancements):**
+
+1.  **Authentication and Authorization:**
+    *   Implement a dual role-based login/signup for students and teachers with a focus on minimal steps.
+    *   Support rapid email, phone number, and Google account login/signup, utilizing mobile-friendly authentication flows.
+    *   Upon signup, pre-populate the profile with minimal required information and offer guided setup.
+    *   Implement user profile controls, allowing users to manage their data visibility with clear options.
+    *   Support integration with native mobile features (e.g., biometric authentication, auto-fill).
+
+2.  **Advanced Class Scheduling:**
+    *   Create a class calendar and schedule overview for upcoming live sessions and pre-recorded content, with smart filtering options.
+    *   Allow students to join live classes directly through the app with a single tap.
+    *   Allow teachers to create, manage, and host live classes easily.
+    *   Integrate seamlessly with the device's native calendar for automatic reminders and scheduling.
+    *   Implement customizable push notifications for class reminders, teacher updates, and community announcements.
+    *   Offer time zone detection and adjustment to help users worldwide.
+    * Students can favorite teachers to follow their future classes.
+    * Students can leave a review of the class.
+
+3.  **Enhanced Reporting System:**
+    *   Implement a user-friendly system for reporting violations (abuse, bad behavior, etc.) within the mobile app.
+    *   Include sophisticated abuse filters for reported content.
+    *   Store reports securely for detailed admin review, with tools for efficient moderation.
+    *   Allow users to report other users, classes and teachers.
+
+4.  **Flexible Donation System:**
+    *   Enable students to donate to teachers using a "Buy Me a Coffee" feature, with quick access to various mobile-friendly payment options.
+    *   Enable users to donate directly to the admin.
+    *   Integrate with secure in-app payment gateways and offer multiple currency options.
+    *   Provide clear donation tracking for both users and teachers.
+
+5. **Admin Panel**
+    * Give the ability to the admin to be able to access all data and have control over user and application, this will have to be responsive to be used on mobile devices.
+    * The admin can make an annoncement to all users.
+    * The admin can block user from a specific country.
+
+6. **Asynchronous learning**
+    * Teachers can upload pre-recorded class.
+    * Students can acces pre-recorded class.
+
+7. **Community**
+    * add a forum for student to interact.
+    * add a forum for teachers to interact.
+    * add a chat for student and teachers.
+
+8. **Global accessibility**
+    * Add a multi-language option.
+    * Offer the ability to change the timezone.
+
+**Security and Privacy (Mobile-Specific Considerations):**
+
+*   Implement end-to-end encryption for meetings, chats, and stored data, optimized for mobile devices.
+*   Users should have granular control over how much personal information is displayed.
+*   No personal data should be shared with other users unless explicitly permitted by the user.
+*   Admins can review sessions and applications for moderation purposes only, with audit trails for accountability.
+*   Utilize secure storage for sensitive data on the device and encrypt all data in transit.
+*   Implement IP blocking for users from restricted countries.
+* The admin can also have multi factor authentification.
+
+**UI/UX and Visual Design (Mobile-Specific Considerations & Usability):**
+
+*   Modern and interactive UI with smooth, intuitive animations, optimized for mobile touch interactions and diverse user capabilities.
+*   Clean layout and responsive design that adapts seamlessly to various screen sizes and orientations on both Android and iOS, ensuring usability for all.
+*   Prioritize mobile-specific UI/UX patterns (e.g., navigation bars, tab bars, modals, swipe gestures) and ensure consistency across platforms.
+*   Utilize advanced graphics, elegant transitions, and visually engaging components that perform well on mobile, with options for low-bandwidth mode.
+*   Seamless navigation with clear, animation-based feedback for user actions.
+*   Use blue as primary color, white as secondary color and grey as accent.
+*   Use Luciole font for all text, ensuring legibility on mobile devices.
+*   Design a unique icon set featuring a globe emerging from an open book, tailored for mobile use and cultural neutrality.
+* Make a dark mode.
+* Add options for users with disabilities (increase font, color blind mode, etc)
+
+**Community Guidelines**
+
+*   No abusive/hate speech.
+*   Use moderate/respectful language.
+*   Political neutrality.
+*   Admin has the final say on violations, with clear guidelines and appeal options.
+
+**Cross-Platform Development:**
+
+*   Employ a cross-platform development framework (e.g., React Native, Flutter) to ensure consistent functionality and UI across Android and iOS, while leveraging platform-specific optimizations.
+*   Highlight any platform-specific features or design considerations that need to be addressed, and document these clearly.
+* Be sure to respect the guidelines of both platform (android and IOs)
+
+**Task:**
+
+Based on the detailed information provided, generate a detailed list of user stories, features, and functionalities required for the GlobalEduConnect mobile application. Ensure that your output aligns with the described user roles, core features, security guidelines, UI/UX requirements, cross-platform development considerations, and our commitment to global accessibility, ease of use, and rapid functionality.
+
+**Output Requirements:**
+
+1.  **User Stories:** Create a comprehensive set of user stories, formatted as "As a \[user role], I want to \[goal], so that \[benefit]." Each user story should be concise, yet clear, and reflect the desired user experience.
+2.  **Feature Breakdown:** Provide a detailed breakdown of the features required for the application, including their functionality, intended user roles, and considerations for usability and accessibility.
+3.  **Technical Requirements:** List any specific technical requirements (e.g., database, encryption, API integrations, push notifications, payment gateways, multimedia streaming, cross-platform framework) and the rationale behind each choice.
+4.  **UI/UX Specifications:** Give a description of how specific UI/UX elements should be designed, like the login screen, class scheduling view, user profile, and reporting interface, considering mobile-specific patterns, usability, and accessibility.
+5.  **Security Checklist:** Describe the necessary security measures that the application should have, with a focus on mobile data security, authentication, and privacy.
+6. **Cross-Platform:** Define the tools and considerations for cross-platform development, detailing the benefits and trade-offs.
+7. **Accessibility**: Give a description of the accessibility options.
+8. **Global Accessibility:** describe all the features that will be useful for global accessibility.
+

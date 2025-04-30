@@ -1,0 +1,109 @@
+You are an expert at understanding complex mobile application requirements and generating detailed feature breakdowns for cross-platform development.
+
+**Context:**
+
+The application is named "GlobalEduConnect," a global public education platform designed to connect students and teachers worldwide through a dedicated mobile application. This application must run seamlessly on both Android and iOS devices. It features role-based access, class scheduling, reporting, and donation systems. The application should be built with a mobile-first approach, a responsive design that adapts to various screen sizes, and a modern, interactive user interface that is consistent across both platforms. It will be important to keep in mind security and privacy.
+
+**Application Overview:**
+
+GlobalEduConnect is a mobile-first platform that enables students to join live public classes and teachers to host them, all within a native mobile app experience. It facilitates a global educational community with features for user management, live class scheduling, content reporting, and a donation system. The application must be designed for optimal performance and user experience on both Android and iOS.
+
+**User Roles:**
+
+1.  **Students:**
+    *   Can sign up/log in using email or Google accounts.
+    *   Must provide at least their name, enrolled subjects, and interests in their profile.
+    *   Can manage their profile's privacy settings (public, private, semi-public).
+    *   Can view a shared schedule/calendar of live public classes.
+    *   Can join live public classes directly through the app.
+    *   Can donate to teachers ("Buy Me a Coffee" functionality) or directly to the admin.
+    *   Can report violations (abuse, bad behavior, etc.) within the app.
+
+2.  **Teachers:**
+    *   Must register using a detailed form that includes their field of expertise, level of knowledge, and an optional teaching demo (video or file).
+    *   Can manage their profile visibility settings (public or visible only to admin).
+    *   Can host live classes that are open to students worldwide.
+    *   Must adhere to community guidelines and maintain good ratings.
+    *   Can make their profile anonymous/private if community guidelines are met.
+    *   Have a "Buy Me a Coffee" donation button on their profile, accessible within the app.
+
+3.  **Admin:**
+    *   Can view, approve, or reject teacher applications.
+    *   Has access to class logs (session times, teachers, attendees) within the app's admin panel.
+    *   Can monitor reports and overall user activity.
+    *   Can receive donations from users.
+    *   Moderates flagged accounts and ensures community safety.
+
+**Core Features and Functionality (Mobile-Specific Considerations):**
+
+1.  **Authentication and Authorization:**
+    *   Implement a dual role-based login/signup for students and teachers.
+    *   Support email and Google account login/signup, utilizing mobile-friendly authentication flows.
+    *   Upon signup, pre-populate the profile with minimal required information.
+    *   Implement user profile controls, allowing users to manage their data visibility.
+    *   Support integration with native mobile features (e.g., biometric authentication).
+
+2.  **Class Scheduling:**
+    *   Create a class calendar and schedule overview for upcoming live sessions.
+    *   Allow students to join live classes directly through the app.
+    *   Allow teachers to host live classes.
+    *   Integrate with the device's native calendar for reminders and scheduling.
+    * Implement push notification for class reminders.
+
+3.  **Reporting System:**
+    *   Implement a system for reporting violations (abuse, bad behavior, etc.) within the mobile app.
+    *   Include abuse filters for reported content.
+    *   Store reports for admin review.
+
+4.  **Donation System:**
+    *   Enable students to donate to teachers using a "Buy Me a Coffee" feature, with mobile-friendly payment options.
+    *   Enable users to donate directly to the admin.
+    *   Integrate with secure in-app payment gateways.
+
+5. **Admin Panel**
+    * Give the ability to the admin to be able to access all data and have control over user and application, this will have to be responsive to be used on mobile devices.
+
+**Security and Privacy (Mobile-Specific Considerations):**
+
+*   Implement end-to-end encryption for meetings, chats, and stored data, optimized for mobile devices.
+*   Users should have control over how much personal information is displayed.
+*   No personal data should be shared with other users unless explicitly permitted by the user.
+*   Admins can review sessions and applications for moderation purposes only.
+*   Utilize secure storage for sensitive data on the device.
+* Have political neutrality by blocking some region, like Israel for example.
+
+**UI/UX and Visual Design (Mobile-Specific Considerations):**
+
+*   Modern and interactive UI with smooth animations, optimized for mobile touch interactions.
+*   Clean layout and responsive design that adapts seamlessly to various screen sizes and orientations on both Android and iOS.
+*   Prioritize mobile-specific UI/UX patterns (e.g., navigation bars, tab bars, modals).
+*   Utilize advanced graphics, elegant transitions, and visually engaging components that perform well on mobile.
+*   Seamless navigation with animation-based feedback for user actions.
+*   Use blue as primary color, white as secondary color and grey as accent.
+* Use Luciole font for all text.
+*   Design a unique icon set featuring a globe emerging from an open book, tailored for mobile use.
+
+**Community Guidelines**
+
+*   No abusive/hate speech.
+*   Use moderate/respectful language.
+*   Political neutrality.
+*   Admin has the final say on violations.
+
+**Cross-Platform Development:**
+
+*   Consider the use of a cross-platform development framework (e.g., React Native, Flutter) to ensure consistent functionality and UI across Android and iOS.
+*   Highlight any platform-specific features or design considerations that need to be addressed.
+
+**Task:**
+
+Based on the detailed information provided, generate a detailed list of user stories, features, and functionalities required for the GlobalEduConnect mobile application. Ensure that your output aligns with the described user roles, core features, security guidelines, UI/UX requirements, and cross-platform development considerations.
+
+**Output Requirements:**
+
+1.  **User Stories:** Create a comprehensive set of user stories, formatted as "As a \[user role], I want to \[goal], so that \[benefit]."
+2.  **Feature Breakdown:** Provide a detailed breakdown of the features required for the application, including their functionality and the user roles they serve.
+3.  **Technical Requirements:** List any specific technical requirements (e.g., database, encryption, API integrations, push notifications, payment gateways) and any recommended cross-platform development framework.
+4.  **UI/UX Specifications:** Give a description of how some UI/UX elements should be designed, like the login screen, considering mobile-specific patterns.
+5.  **Security Checklist:** Describe the necessary security measures that the application should have, with a focus on mobile data security.
+6. **Cross-Platform:** Define the tools and considerations for cross-platform development.
