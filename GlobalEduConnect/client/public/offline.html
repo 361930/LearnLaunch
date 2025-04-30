@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlobalEduConnect - Offline</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 40px 20px;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+    
+    .icon {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 24px;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 16px;
+      color: #222;
+    }
+    
+    p {
+      margin-bottom: 24px;
+      color: #666;
+    }
+    
+    .button {
+      display: inline-block;
+      background-color: #4f46e5;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: background-color 0.2s;
+    }
+    
+    .button:hover {
+      background-color: #4338ca;
+    }
+    
+    .cached-content {
+      margin-top: 32px;
+      text-align: left;
+      width: 100%;
+    }
+    
+    .cache-title {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: #333;
+    }
+    
+    .cache-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    
+    .cache-item {
+      margin-bottom: 8px;
+    }
+    
+    .cache-link {
+      color: #4f46e5;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 4px;
+      background-color: #f3f4f6;
+    }
+    
+    .cache-link:hover {
+      background-color: #e5e7eb;
+    }
+    
+    .cache-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #1a1a1a;
+        color: #f5f5f5;
+      }
+      
+      .container {
+        background-color: #2a2a2a;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      
+      h1 {
+        color: #f5f5f5;
+      }
+      
+      p {
+        color: #b0b0b0;
+      }
+      
+      .cache-title {
+        color: #e0e0e0;
+      }
+      
+      .cache-link {
+        background-color: #333;
+        color: #a3bffa;
+      }
+      
+      .cache-link:hover {
+        background-color: #404040;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+      <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+      <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+      <line x1="12" y1="20" x2="12.01" y2="20"></line>
+    </svg>
+    
+    <h1>You're currently offline</h1>
+    <p>It looks like you don't have an internet connection. Some features may be unavailable until you're back online.</p>
+    
+    <a href="/" class="button">Try again</a>
+    
+    <div class="cached-content" id="cached-pages">
+      <h3 class="cache-title">Available offline content:</h3>
+      <ul class="cache-list" id="cache-list">
+        <!-- This list will be populated by JavaScript if available -->
+        <li class="cache-item">
+          <a href="/" class="cache-link">
+            <svg class="cache-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            Home
+          </a>
+        </li>
+        <li class="cache-item">
+          <a href="/challenges" class="cache-link">
+            <svg class="cache-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Challenges
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Check if we're back online periodically
+    function checkOnlineStatus() {
+      if (navigator.onLine) {
+        window.location.reload();
+      }
+    }
+    
+    // Check status every 5 seconds
+    setInterval(checkOnlineStatus, 5000);
+    
+    // Also check when the window gets focus
+    window.addEventListener('focus', checkOnlineStatus);
+  </script>
+</body>
+</html>
