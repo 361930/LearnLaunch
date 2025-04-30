@@ -1,0 +1,198 @@
+AI Implementation Agent Prompt: GlobalEduConnect Improvements (No Firebase)
+
+Objective: Enhance the existing GlobalEduConnect React Native app (with local-only Node.js/Express backend) into a polished, production-ready, standalone mobile application for Android and iOS. Use TypeScript/JavaScript for the mobile app and Node.js/Express for the backend, SQLite or JSON file storage (no cloud DB), and implement real-time chat & notifications via WebSockets (Socket.IO) and local push notifications—do not use Firebase.
+
+1. UI / UX Enhancements
+Design System:
+
+Define a global color palette (primary, secondary, neutrals, success, error).
+
+Establish a typography scale (H1–H6, body, captions).
+
+Enforce an 8-point spacing grid for margins and paddings.
+
+Adaptive & Responsive Layouts:
+
+Ensure compatibility on small phones through large tablets using useWindowDimensions() and flex/% units.
+
+Touch-Target & Accessibility:
+
+Make all tappable elements ≥ 44×44 dp.
+
+Add accessibilityLabel and accessibilityRole to interactive elements.
+
+Support dynamic font sizing and ensure 4.5:1 contrast for text/background.
+
+Onboarding Flow:
+
+Build a three-screen carousel (illustration + headline + CTA).
+
+Include “Skip” and “Get Started” buttons; persist completion in AsyncStorage.
+
+Skeleton & Loading States:
+
+Create a reusable <LoadingOverlay> or skeleton component for lists and forms during data fetches.
+
+Error Handling & Feedback:
+
+Centralize a toast/snackbar system for network or validation errors.
+
+Provide retry buttons on failed API calls.
+
+Theming & Dark Mode:
+
+Use React Native Paper theming; support light/dark toggle, defaulting to system.
+
+Iconography & Assets:
+
+Use vector icons (MaterialCommunityIcons) consistently.
+
+Preload key assets and replace bitmap avatars with optimized images or SVGs.
+
+Navigation Refinements:
+
+Implement bottom-tab navigator for main flows (Home, Search, Messages, Profile) plus stack navigators.
+
+Support deep links (globaledu://class/:id).
+
+2. Feature & Functional Improvements
+Search & Discovery:
+
+Add a global search bar: courses, instructors, tags.
+
+Implement filters by subject, language, level, rating.
+
+Display “Recent Searches” and “Popular Searches.”
+
+Course Creation & Management (Teacher):
+
+Multi-step wizard: details → curriculum → media upload → donation setup.
+
+Client-side image/video compression and preview.
+
+Real-Time Chat & Notifications:
+
+Use Socket.IO on backend and React Native Socket.IO client for class discussions.
+
+Build an in-app notification center screen.
+
+For push notifications, use a library like react-native-push-notification tied to your backend’s event emitter.
+
+Ratings & Reviews:
+
+After class completion, prompt students for star rating (1–5) + text.
+
+Show average rating on class cards and detail screens.
+
+Gamification:
+
+Badge system (first class completed, discussion milestones).
+
+Daily streak counter and class-level leaderboards.
+
+Offline Support:
+
+Cache classes & discussions via React Query + AsyncStorage.
+
+“Offline mode” banner and action queueing for comments.
+
+Profile & Settings:
+
+Profile completeness meter; social login (Google/Facebook SDKs).
+
+Language selection (i18n) and RTL support.
+
+Monetization & Donations:
+
+Integrate Stripe or Razorpay for student tips/donations.
+
+Teachers configure “pay what you can” links.
+
+3. Performance & Stability
+List Virtualization:
+
+Use FlatList/SectionList with getItemLayout for large data sets.
+
+Image Optimization:
+
+Use react-native-image-resizer and react-native-fast-image for caching.
+
+Code-Splitting & Lazy Loading:
+
+Lazy-load heavy components via React.lazy and Suspense.
+
+Memory Management:
+
+Clean up subscriptions (Socket.IO, network) on unmount; avoid inline props.
+
+Crash Reporting & Analytics:
+
+Integrate Sentry or a self-hosted crash reporter; log key events with a lightweight analytics service or custom solution.
+
+4. Security & Data Integrity
+Secure Storage:
+
+Store JWTs in SecureStore (Keychain/Keystore) instead of AsyncStorage.
+
+Input Validation & Sanitization:
+
+Validate all form inputs client-side; strip HTML from user content.
+
+Rate-Limiting (Backend):
+
+Use express-rate-limit on auth and critical endpoints.
+
+Password Reset & Email Verification:
+
+Implement /auth/request-reset and /auth/reset-password flows with email tokens (using Nodemailer with your local SMTP or a test mail server).
+
+Certificate Pinning (Optional):
+
+Pin SSL certificate using react-native-cert-pinner to prevent MITM.
+
+5. Code Quality & Testing
+TypeScript Strictness:
+
+Enable strict: true; avoid any; type all API responses & component props.
+
+Linting & Formatting:
+
+Configure ESLint + Prettier; enforce with Husky + lint-staged.
+
+Unit & Integration Tests:
+
+Jest tests for utilities & API client; React Native Testing Library for screens.
+
+End-to-End Tests:
+
+Use Detox or Appium for flows: register → login → join class → post message.
+
+6. Localization & Global Reach
+i18n Integration:
+
+Use react-native-localize + i18next; externalize strings to JSON.
+
+Provide English + one other language (e.g., Spanish).
+
+Date/Time & Time Zones:
+
+Use date-fns with locale support; display and schedule times in user’s local zone.
+
+7. CI / CD & Deployment
+Automated Builds:
+
+GitHub Actions: install → lint → test → build Android AAB & iOS IPA → upload to Play Internal & TestFlight.
+
+Environment Management:
+
+Dotenv files per environment; secure env decryption in CI.
+
+Versioning & Changelogs:
+
+Use Conventional Commits; auto-generate CHANGELOG.md.
+
+Release Monitoring:
+
+Track crash rates and user feedback; prepare hotfix pipelines.
+
+Deliverable: A complete, polished GlobalEduConnect app repository (mobile + local backend), fully tested, accessible, performant, secure, and ready for Play Store & App Store submission—without using Firebase.
